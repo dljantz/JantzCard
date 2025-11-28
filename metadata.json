@@ -1,0 +1,5 @@
+{
+  "name": "JantzCard",
+  "description": "A spaced repetition flashcard app that uses Google Sheets for flashcard management and focuses on user-controlled study intervals to train metacognition.",
+  "requestFramePermissions": []
+}
