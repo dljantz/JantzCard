@@ -17,6 +17,16 @@ import {
 
 const BACKLOG_STORAGE_KEY = 'jantzcard_pending_sheet_updates';
 
+// Temporary debugging helper to log queue state
+const logQueueToConsole = (queue: string[], cards: Card[]) => {
+  console.log('%c--- Current Study Queue ---', 'color: #4ade80; font-weight: bold;');
+  const output = queue.map(id => {
+    const card = cards.find(c => c.id === id);
+    return card ? card.front : `[Unknown ID: ${id}]`;
+  }).join('\n');
+  console.log(output || "(Queue is empty)");
+};
+
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.Home);
   const [dataSource, setDataSource] = useState<DataSource>(DataSource.Mock);
@@ -64,6 +74,7 @@ const App: React.FC = () => {
     setAllCards(cardsData);
     const initialQueue = calculateStudyQueue(cardsData);
     setSessionQueue(initialQueue);
+    logQueueToConsole(initialQueue, cardsData);
     setAppState(AppState.Studying);
   }, []);
 
@@ -143,6 +154,7 @@ const App: React.FC = () => {
       }
 
       setSessionQueue(initialQueue);
+      logQueueToConsole(initialQueue, cardsForQueue);
       setAppState(AppState.Studying);
     } catch (err: any) {
       console.error(err);
@@ -168,6 +180,9 @@ const App: React.FC = () => {
     setAllCards(newCards);
     const newQueue = calculateStudyQueue(newCards);
     setSessionQueue(newQueue);
+    
+    // Log resulting queue
+    logQueueToConsole(newQueue, newCards);
 
     try {
       if (dataSource === DataSource.Sheet) {
