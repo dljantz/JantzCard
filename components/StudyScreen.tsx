@@ -84,8 +84,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({ queue, currentCard, onCardUpd
   }
 
   const overdueness = getProportionalOverdueness(currentCard, Date.now());
-  const displayOverdueness = overdueness === Infinity ? '∞ (New Card)' : overdueness.toFixed(2);
-
+  
   // Safe check for string existence before includes
   const isSavedLocallyWarning = saveError && saveError.includes && saveError.includes('saved to this device');
 
@@ -94,7 +93,16 @@ const StudyScreen: React.FC<StudyScreenProps> = ({ queue, currentCard, onCardUpd
       <header className="p-4 bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 relative">
         <h2 className="text-xl font-bold text-center">JantzCard Study Session</h2>
         <div className="text-center text-sm text-gray-400 mt-1">{`Cards Remaining: ${queue.length}`}</div>
-        <div className="text-center text-xs text-yellow-400 mt-1 font-mono">{`Proportional Overdueness: ${displayOverdueness}`}</div>
+        
+        <div className="text-center text-xs text-blue-200/70 mt-2 font-medium tracking-wide">
+          {overdueness === Infinity ? (
+            <span>New Card</span>
+          ) : (
+            <span>
+              The last study interval for this card was <span className="text-white font-bold">{parseFloat(overdueness.toPrecision(2))}</span> times longer than the intended interval
+            </span>
+          )}
+        </div>
         
         <div className="absolute top-1/2 right-4 -translate-y-1/2 flex items-center space-x-2 text-xs md:text-sm">
           {isSaving ? (
