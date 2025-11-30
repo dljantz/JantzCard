@@ -202,6 +202,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({ queue, currentCard, onCardUpd
       <footer className="sticky bottom-0 left-0 right-0 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700 p-2 md:p-4">
         <IntervalSelector
           centerIntervalLabel={centerIntervalLabel}
+          lastIntendedInterval={currentCard.currentStudyInterval}
           onSelect={handleIntervalSelect}
           preselection={preselectedInterval}
           isFlipped={isFlipped}

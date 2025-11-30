@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface IntervalButtonProps {
@@ -8,9 +9,19 @@ interface IntervalButtonProps {
   title?: string;
   size?: 'default' | 'small';
   disabled?: boolean;
+  isBold?: boolean;
 }
 
-const IntervalButton: React.FC<IntervalButtonProps> = ({ interval, backgroundColor, isSelected, onClick, title, size = 'default', disabled = false }) => {
+const IntervalButton: React.FC<IntervalButtonProps> = ({ 
+  interval, 
+  backgroundColor, 
+  isSelected, 
+  onClick, 
+  title, 
+  size = 'default', 
+  disabled = false,
+  isBold = false 
+}) => {
   
   const sizeClasses = {
     default: "h-16 md:h-20 text-2xl",
@@ -27,7 +38,8 @@ const IntervalButton: React.FC<IntervalButtonProps> = ({ interval, backgroundCol
     return <div className={`w-full ${placeholderSizeClasses[size]}`}></div>;
   }
 
-  const baseClasses = "w-full flex items-center justify-center rounded-md text-white font-bold transition-all duration-150 ease-in-out focus:outline-none transform";
+  const fontWeight = isBold ? "font-black" : "font-bold";
+  const baseClasses = `w-full flex items-center justify-center rounded-md text-white ${fontWeight} transition-all duration-150 ease-in-out focus:outline-none transform`;
   
   // State-dependent classes for scaling and rings.
   const stateClasses = isSelected

@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { STUDY_INTERVALS, RED_INTERVAL_COLORS, YELLOW_INTERVAL_COLOR, GREEN_INTERVAL_COLORS, DEFAULT_CENTER_INTERVAL } from '../constants';
 import IntervalButton from './IntervalButton';
@@ -5,6 +6,7 @@ import useViewport from '../hooks/useViewport';
 
 interface IntervalSelectorProps {
   centerIntervalLabel: string;
+  lastIntendedInterval?: string | null;
   onSelect: (interval: string) => void;
   preselection: string | null;
   isFlipped: boolean;
@@ -14,7 +16,14 @@ interface IntervalSelectorProps {
 const intervalLabels = STUDY_INTERVALS.map(i => i.label);
 const SHORT_SCREEN_HEIGHT_THRESHOLD = 500; // Switch to single-row layout below this height in pixels
 
-const IntervalSelector: React.FC<IntervalSelectorProps> = ({ centerIntervalLabel, onSelect, preselection, isFlipped, isDisabled = false }) => {
+const IntervalSelector: React.FC<IntervalSelectorProps> = ({ 
+  centerIntervalLabel, 
+  lastIntendedInterval,
+  onSelect, 
+  preselection, 
+  isFlipped, 
+  isDisabled = false 
+}) => {
   const { height } = useViewport();
   const isShortScreen = height < SHORT_SCREEN_HEIGHT_THRESHOLD;
 
@@ -37,6 +46,23 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({ centerIntervalLabel
     return { redIntervals: reds, centerInterval: center, greenIntervals: greens };
   }, [centerIntervalLabel]);
 
+  const getButtonTooltip = (interval: string | null, isCenter: boolean) => {
+    if (!interval) return undefined;
+
+    const isIntended = interval === lastIntendedInterval;
+
+    if (isCenter && isIntended) {
+      return "Repeat last study interval";
+    }
+    if (isCenter) {
+      return "Repeat last actual study interval";
+    }
+    if (isIntended) {
+      return "Repeat last intended study interval";
+    }
+    return undefined;
+  };
+
   const getPromptText = () => {
     if (isDisabled) {
       return 'Saving...'
@@ -56,18 +82,23 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({ centerIntervalLabel
     
     return (
       <div className={`w-full grid grid-cols-11 gap-1 md:gap-2 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
-        {allIntervals.map((interval, index) => (
-          <IntervalButton
-            key={interval ? `all-${interval}` : `all-empty-${index}`}
-            interval={interval}
-            backgroundColor={allColors[index]}
-            isSelected={preselection === interval}
-            onClick={() => interval && onSelect(interval)}
-            size="small"
-            title={interval === centerInterval ? "Approximate time since last exposure" : undefined}
-            disabled={isDisabled}
-          />
-        ))}
+        {allIntervals.map((interval, index) => {
+          // The center element in single row layout with 11 items (5 red, 1 center, 5 green) is index 5
+          const isCenter = index === 5;
+          return (
+            <IntervalButton
+              key={interval ? `all-${interval}` : `all-empty-${index}`}
+              interval={interval}
+              backgroundColor={allColors[index]}
+              isSelected={preselection === interval}
+              onClick={() => interval && onSelect(interval)}
+              size="small"
+              title={getButtonTooltip(interval, isCenter)}
+              disabled={isDisabled}
+              isBold={interval === lastIntendedInterval}
+            />
+          );
+        })}
       </div>
     );
   };
@@ -85,7 +116,9 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({ centerIntervalLabel
               isSelected={preselection === interval}
               onClick={() => interval && onSelect(interval)}
               size="default"
+              title={getButtonTooltip(interval, false)}
               disabled={isDisabled}
+              isBold={interval === lastIntendedInterval}
             />
           ))}
         </div>
@@ -97,9 +130,10 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({ centerIntervalLabel
             backgroundColor={YELLOW_INTERVAL_COLOR}
             isSelected={preselection === centerInterval}
             onClick={() => centerInterval && onSelect(centerInterval)}
-            title="Approximate time since last exposure"
+            title={getButtonTooltip(centerInterval, true)}
             size="default"
             disabled={isDisabled}
+            isBold={centerInterval === lastIntendedInterval}
           />
         </div>
 
@@ -113,7 +147,9 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({ centerIntervalLabel
               isSelected={preselection === interval}
               onClick={() => interval && onSelect(interval)}
               size="default"
+              title={getButtonTooltip(interval, false)}
               disabled={isDisabled}
+              isBold={interval === lastIntendedInterval}
             />
           ))}
         </div>
