@@ -11,8 +11,15 @@ export const getProportionalOverdueness = (card: Card, now: number): number => {
   if (!card.lastSeen || !card.currentStudyInterval) {
     return Infinity; // New cards are infinitely overdue
   }
-  const intervalMs = intervalMap.get(card.currentStudyInterval) || 1;
+  
+  const intervalMs = intervalMap.get(card.currentStudyInterval);
+  // If interval is invalid/corrupt, treat as infinitely overdue (New Card behavior)
+  if (!intervalMs) return Infinity;
+
   const lastSeenTime = new Date(card.lastSeen).getTime();
+  // If date is invalid/corrupt, treat as infinitely overdue (New Card behavior)
+  if (isNaN(lastSeenTime)) return Infinity;
+
   const elapsedTime = now - lastSeenTime;
   return elapsedTime / intervalMs;
 };
@@ -30,11 +37,13 @@ export const calculateStudyQueue = (cards: Card[]): string[] => {
       return true; // New cards are always overdue
     }
     const intervalMs = intervalMap.get(card.currentStudyInterval);
-    // If the interval is not in our master list, treat it as not overdue.
-    // This is a safe default to prevent cards with corrupted data from flooding the queue.
-    if (!intervalMs) return false;
+    // If the interval is not in our master list (e.g. "kasdf"), treat it as corrupt/new and thus overdue.
+    if (!intervalMs) return true;
     
     const lastSeenTime = new Date(card.lastSeen).getTime();
+    // If the date is invalid (e.g. "invalid-date"), treat it as corrupt/new and thus overdue.
+    if (isNaN(lastSeenTime)) return true;
+    
     const dueTime = lastSeenTime + intervalMs;
     return now >= dueTime;
   });
@@ -49,6 +58,9 @@ export const calculateStudyQueue = (cards: Card[]): string[] => {
     const overduenessA = getProportionalOverdueness(a, now);
     const overduenessB = getProportionalOverdueness(b, now);
 
+    // Handle Infinity - Infinity = NaN case
+    if (overduenessA === overduenessB) return 0;
+    
     return overduenessB - overduenessA;
   });
 
