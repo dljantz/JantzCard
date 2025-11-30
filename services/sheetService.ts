@@ -61,16 +61,21 @@ export const loadCardsFromSheet = async (spreadsheetId: string): Promise<Card[]>
         id = generateUniqueId();
     }
 
+    // Logic for Priority:
+    // Defaults to Number.MAX_SAFE_INTEGER (lowest possible priority) if empty or invalid.
+    const parsedPriority = parseInt(row[3]);
+    const priorityLevel = isNaN(parsedPriority) ? Number.MAX_SAFE_INTEGER : parsedPriority;
+
     return {
       id: id,
       front: row[0] || '',
       back: row[1] || '',
       category: row[2] || 'General',
-      priorityLevel: parseInt(row[3]) || 1,
+      priorityLevel: priorityLevel,
       lastSeen: row[4] || null,
       currentStudyInterval: row[5] || null,
     };
-  }).filter((c: Card) => c.front || c.back);
+  }).filter((c: Card) => !!c.front); // Only load cards where Front is present (non-empty)
 };
 
 /**

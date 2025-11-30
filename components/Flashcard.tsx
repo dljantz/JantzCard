@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card } from '../types';
 
@@ -9,6 +10,9 @@ interface FlashcardProps {
 const Flashcard: React.FC<FlashcardProps> = ({ card, isFlipped }) => {
   // Common classes for both faces of the card to ensure consistency.
   const faceClasses = "flex flex-col items-center justify-center p-6 rounded-xl shadow-2xl border min-h-48";
+
+  // Display 'None' (or hide it) if priority is set to the default "infinite" value.
+  const displayPriority = card.priorityLevel === Number.MAX_SAFE_INTEGER ? 'Default' : card.priorityLevel;
 
   return (
     // The perspective container sets up the 3D space for its children.
@@ -31,7 +35,7 @@ const Flashcard: React.FC<FlashcardProps> = ({ card, isFlipped }) => {
           style={{ gridArea: 'card' }} 
           className={`${faceClasses} [backface-visibility:hidden] bg-gray-800 border-gray-700`}
         >
-          <p className="text-gray-400 text-sm mb-2">Priority: {card.priorityLevel}</p>
+          <p className="text-gray-400 text-sm mb-2">Priority: {displayPriority}</p>
           <p className="text-2xl md:text-4xl text-center text-gray-100 font-['Merriweather',_serif]">{card.front}</p>
         </div>
 
