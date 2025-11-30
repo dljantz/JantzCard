@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card, DataSource } from '../types';
 import Flashcard from './Flashcard';
 import IntervalSelector from './IntervalSelector';
@@ -21,12 +21,53 @@ const StudyScreen: React.FC<StudyScreenProps> = ({ queue, currentCard, onCardUpd
   const [isFlipped, setIsFlipped] = useState(false);
   const [preselectedInterval, setPreselectedInterval] = useState<string | null>(null);
 
-  // Effect to reset the card state when a new card comes in
-  useEffect(() => {
-    setIsFlipped(false);
-    setPreselectedInterval(null);
-  }, [currentCard?.id]);
+  // Transition state to hold the previous card's back content during animation
+  const [transitionBack, setTransitionBack] = useState<string | null>(null);
+  
+  // Refs to track state without triggering effect re-runs prematurely
+  const previousCardRef = useRef<Card | null>(null);
+  const isFlippedRef = useRef(isFlipped);
 
+  // Keep isFlipped ref in sync for use inside the card change effect
+  useEffect(() => {
+    isFlippedRef.current = isFlipped;
+  }, [isFlipped]);
+
+  // Handle Card Changes and Transitions
+  useEffect(() => {
+    // Check if the card identity has changed (e.g. moved to next card)
+    if (currentCard?.id !== previousCardRef.current?.id) {
+      
+      const wasFlipped = isFlippedRef.current;
+      const prevCard = previousCardRef.current;
+
+      // If we are transitioning from a Flipped card to a new card,
+      // we want to animate flipping back to front (180deg -> 0deg).
+      // During this animation, the back face is visible for the first half.
+      // We must render the OLD card's back on the back face so the user sees "Back A" -> flip -> "Front B".
+      if (wasFlipped && prevCard) {
+        setTransitionBack(prevCard.back);
+        setIsFlipped(false); // Trigger the flip animation (Back to Front)
+        setPreselectedInterval(null);
+
+        // Clear the override after the CSS transition finishes (700ms matches Flashcard CSS)
+        const timer = setTimeout(() => {
+          setTransitionBack(null);
+        }, 700);
+
+        // Note: We don't return a cleanup function here that clears the timeout 
+        // because we want the timeout to persist even if isFlipped changes state 
+        // (which causes a re-render but not a re-run of this specific effect).
+      } else {
+        // Standard reset (e.g. loading first card, or moving from unflipped state)
+        setIsFlipped(false);
+        setPreselectedInterval(null);
+        setTransitionBack(null);
+      }
+
+      previousCardRef.current = currentCard;
+    }
+  }, [currentCard]); // Only run when currentCard prop specifically changes
 
   useEffect(() => {
     // When the queue is empty and there's no card, the session is over.
@@ -74,8 +115,19 @@ const StudyScreen: React.FC<StudyScreenProps> = ({ queue, currentCard, onCardUpd
     const elapsedMs = Date.now() - new Date(currentCard.lastSeen).getTime();
     return findClosestInterval(elapsedMs);
   }, [currentCard]);
+
+  // Construct the display card.
+  // If we are in a transition, we overlay the previous card's back content onto the new card
+  // so the flip animation looks correct (Back Old -> Front New).
+  const displayCard = useMemo(() => {
+    if (!currentCard) return null;
+    if (transitionBack) {
+      return { ...currentCard, back: transitionBack };
+    }
+    return currentCard;
+  }, [currentCard, transitionBack]);
   
-  if (!currentCard) {
+  if (!currentCard || !displayCard) {
      return (
       <div className="flex-grow flex items-center justify-center">
         <p className="text-2xl">{queue.length > 0 ? 'Loading card...' : 'Completing session...'}</p>
@@ -143,7 +195,8 @@ const StudyScreen: React.FC<StudyScreenProps> = ({ queue, currentCard, onCardUpd
       </header>
 
       <main className="flex-grow flex items-center justify-center p-4 overflow-auto">
-        <Flashcard key={currentCard.id} card={currentCard} isFlipped={isFlipped} />
+        {/* We remove the key prop to allow the same component instance to transition its CSS properties */}
+        <Flashcard card={displayCard} isFlipped={isFlipped} />
       </main>
 
       <footer className="sticky bottom-0 left-0 right-0 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700 p-2 md:p-4">
