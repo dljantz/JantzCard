@@ -13,12 +13,23 @@ interface StudyScreenProps {
   onCardUpdate: (updatedCard: Card) => void;
   onFinish: () => void;
   onExit: () => void;
+  onReload: () => void;
   isSaving: boolean;
   dataSource: DataSource;
   saveError: string | null;
 }
 
-const StudyScreen: React.FC<StudyScreenProps> = ({ queue, currentCard, onCardUpdate, onFinish, onExit, isSaving, dataSource, saveError }) => {
+const StudyScreen: React.FC<StudyScreenProps> = ({ 
+  queue, 
+  currentCard, 
+  onCardUpdate, 
+  onFinish, 
+  onExit, 
+  onReload,
+  isSaving, 
+  dataSource, 
+  saveError 
+}) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [preselectedInterval, setPreselectedInterval] = useState<string | null>(null);
 
@@ -144,7 +155,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({ queue, currentCard, onCardUpd
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <header className="p-4 bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 relative">
-        <div className="absolute top-4 left-4 z-20">
+        <div className="absolute top-4 left-4 z-20 flex gap-2">
           <button 
             onClick={onExit}
             className="text-gray-400 hover:text-white transition-colors flex items-center gap-1 p-1 -ml-1 rounded-md hover:bg-gray-700/50"
@@ -155,6 +166,20 @@ const StudyScreen: React.FC<StudyScreenProps> = ({ queue, currentCard, onCardUpd
             </svg>
             <span className="hidden sm:inline text-sm font-medium">Home</span>
           </button>
+          
+          {dataSource === DataSource.Sheet && (
+             <button 
+              onClick={onReload}
+              disabled={isSaving}
+              className={`text-gray-400 hover:text-white transition-colors flex items-center gap-1 p-1 rounded-md hover:bg-gray-700/50 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title="Reload Deck"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+              <span className="hidden sm:inline text-sm font-medium">Reload</span>
+            </button>
+          )}
         </div>
 
         <h2 className="text-xl font-bold text-center">JantzCard Study Session</h2>

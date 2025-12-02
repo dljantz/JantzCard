@@ -167,6 +167,63 @@ const App: React.FC = () => {
     }
   }, [pendingUpdates, processBacklog]);
 
+  const handleReloadDeck = useCallback(async () => {
+    if (dataSource !== DataSource.Sheet) return;
+    
+    const sheetUrl = localStorage.getItem('jantzcard_sheet_url');
+    const spreadsheetId = sheetUrl ? extractSpreadsheetId(sheetUrl) : null;
+    
+    if (!spreadsheetId) {
+      setSyncMessage("Error: Could not find Sheet ID to reload.");
+      return;
+    }
+
+    setIsSyncing(true);
+    setSyncMessage("Reloading deck...");
+
+    try {
+      // Attempt to sync pending updates first so we don't lose them if we fetch fresh data
+      if (pendingUpdates.length > 0) {
+        await processBacklog(spreadsheetId, pendingUpdates);
+      }
+
+      const cardsData = await loadCardsFromSheet(spreadsheetId);
+      
+      if (cardsData.length === 0) {
+        setSyncMessage("Reload returned 0 cards.");
+      } else {
+        // Merge any remaining pending updates (if sync failed)
+        let finalCards = cardsData;
+        if (pendingUpdates.length > 0) {
+            finalCards = cardsData.map(card => {
+              const pending = pendingUpdates.find(p => p.id === card.id);
+              if (pending) {
+                  return { 
+                    ...card, 
+                    lastSeen: pending.lastSeen, 
+                    currentStudyInterval: pending.currentStudyInterval 
+                  };
+              }
+              return card;
+            });
+        }
+        
+        setAllCards(finalCards);
+        const newQueue = calculateStudyQueue(finalCards);
+        setSessionQueue(newQueue);
+        logQueueToConsole(newQueue, finalCards);
+        
+        setSyncMessage("Deck reloaded!");
+        setTimeout(() => setSyncMessage(null), 2000);
+      }
+    } catch (err: any) {
+      console.error("Reload failed", err);
+      setSyncMessage("Reload failed: " + (err.message || "Unknown error"));
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [dataSource, pendingUpdates, processBacklog]);
+
   const handleGoogleLogin = useCallback(async (apiKey: string, clientId: string, silent: boolean = false) => {
     const result = await initializeClient(apiKey, clientId);
     if (result.success && !result.restored && !silent) {
@@ -298,6 +355,7 @@ const App: React.FC = () => {
             onCardUpdate={handleCardUpdate}
             onFinish={handleFinishStudy}
             onExit={handleRestart}
+            onReload={handleReloadDeck}
             isSaving={isSyncing}
             dataSource={dataSource}
             saveError={getSaveStatusMessage()}
