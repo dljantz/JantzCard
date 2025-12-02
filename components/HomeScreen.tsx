@@ -108,7 +108,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
         const response = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: spreadsheetId,
-            range: 'A1'
+            range: 'Deck!A1'
         });
 
         const cellValue = response.result.values?.[0]?.[0] ?? "(Empty Cell)";
@@ -166,10 +166,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                             disabled={isVerifying || !sheetUrl}
                             className={`bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded text-sm transition-colors flex-shrink-0 ${isVerifying ? 'opacity-50' : ''}`}
                         >
-                            {isVerifying ? 'Checking...' : 'Check A1'}
+                            {isVerifying ? 'Checking...' : 'Check Deck!A1'}
                         </button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Paste the URL of a sheet you have access to. We will try to read cell A1.</p>
+                    <p className="text-xs text-gray-500 mt-1">Paste the URL of a sheet you have access to. It must have a tab named <strong>Deck</strong>.</p>
                 </div>
 
                 {/* Verification Result */}
@@ -177,7 +177,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     <div className="bg-green-900/20 border border-green-800 p-3 rounded text-sm animate-fade-in">
                         <p className="text-green-400 font-bold mb-1">✓ Connection Verified</p>
                         <p className="text-gray-300">
-                            Content of cell <span className="font-mono bg-gray-800 px-1 rounded text-white">A1</span>:
+                            Content of cell <span className="font-mono bg-gray-800 px-1 rounded text-white">Deck!A1</span>:
                         </p>
                         <p className="text-xl text-white font-mono mt-2 p-2 bg-gray-800 rounded border border-gray-700 break-all">
                             {verificationResult.value}
@@ -215,7 +215,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span>Loading Sheet...</span>
+                        <span>Loading Deck...</span>
                       </>
                    ) : "Start Session (Sheets Data)"}
                  </button>

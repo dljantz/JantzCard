@@ -44,7 +44,7 @@ export const loadCardsFromSheet = async (spreadsheetId: string): Promise<Card[]>
 
   const response = await window.gapi.client.sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: 'Sheet1!A2:G', // Fetch columns A through G, starting at row 2
+    range: 'Deck!A2:G', // Fetch columns A through G, starting at row 2
   });
 
   const rows = response.result.values;
@@ -89,7 +89,7 @@ const findRowForCard = async (spreadsheetId: string, card: Card): Promise<number
   // We fetch A:G to be safe and reduce API calls, though strictly we just need A,B,G.
   const response = await window.gapi.client.sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: 'Sheet1!A2:G', 
+    range: 'Deck!A2:G', 
     majorDimension: 'ROWS'
   });
 
@@ -129,7 +129,7 @@ export const updateCardInSheet = async (spreadsheetId: string, card: Card): Prom
   
   // Update Columns E (Last Seen), F (Interval), and G (ID)
   // Writing ID ensures that if it was a generated ID, it is now persisted.
-  const range = `Sheet1!E${rowNumber}:G${rowNumber}`;
+  const range = `Deck!E${rowNumber}:G${rowNumber}`;
   
   const values = [
     [
@@ -161,7 +161,7 @@ export const batchUpdateCards = async (spreadsheetId: string, updates: PendingCa
   // 1. Fetch current sheet state to map IDs to Rows
   const response = await window.gapi.client.sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: 'Sheet1!A2:G',
+    range: 'Deck!A2:G',
   });
   const rows = response.result.values || [];
 
@@ -180,7 +180,7 @@ export const batchUpdateCards = async (spreadsheetId: string, updates: PendingCa
     if (rowIndex !== -1) {
        const rowNumber = rowIndex + 2;
        data.push({
-         range: `Sheet1!E${rowNumber}:G${rowNumber}`,
+         range: `Deck!E${rowNumber}:G${rowNumber}`,
          values: [[update.lastSeen, update.currentStudyInterval, update.id]]
        });
     }
