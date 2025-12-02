@@ -198,6 +198,9 @@ const App: React.FC = () => {
             // 1. Try to save the current card
             await updateCardInSheet(spreadsheetId, updatedCard);
             
+            // Success: Clear any persistent error messages (like "Sync skipped")
+            setSyncMessage(null);
+            
             // 2. If successful, check if we need to flush the backlog
             // Use the FRESH pendingUpdates from the ref/state if possible, but here we depend on the prop.
             if (pendingUpdates.length > 0) {
@@ -238,11 +241,9 @@ const App: React.FC = () => {
         }
       } else {
         await updateMockCard(updatedCard);
+        setSyncMessage(null);
       }
       
-      // Clear generic sync messages on success loop (unless we just set a specific warning)
-      setSyncMessage(prev => prev === "Sync skipped: Card deleted remotely." ? prev : null);
-
     } catch (error: any) {
       console.error("Critical error in handleCardUpdate:", error);
       // This catch block handles system errors (like missing spreadsheet ID), 
