@@ -287,6 +287,7 @@ const App: React.FC = () => {
             currentCard={currentCard}
             onCardUpdate={handleCardUpdate}
             onFinish={handleFinishStudy}
+            onExit={handleRestart}
             isSaving={isSyncing}
             dataSource={dataSource}
             saveError={getSaveStatusMessage()}

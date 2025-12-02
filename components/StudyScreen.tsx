@@ -12,12 +12,13 @@ interface StudyScreenProps {
   currentCard: Card | null;
   onCardUpdate: (updatedCard: Card) => void;
   onFinish: () => void;
+  onExit: () => void;
   isSaving: boolean;
   dataSource: DataSource;
   saveError: string | null;
 }
 
-const StudyScreen: React.FC<StudyScreenProps> = ({ queue, currentCard, onCardUpdate, onFinish, isSaving, dataSource, saveError }) => {
+const StudyScreen: React.FC<StudyScreenProps> = ({ queue, currentCard, onCardUpdate, onFinish, onExit, isSaving, dataSource, saveError }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [preselectedInterval, setPreselectedInterval] = useState<string | null>(null);
 
@@ -143,6 +144,19 @@ const StudyScreen: React.FC<StudyScreenProps> = ({ queue, currentCard, onCardUpd
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <header className="p-4 bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 relative">
+        <div className="absolute top-4 left-4 z-20">
+          <button 
+            onClick={onExit}
+            className="text-gray-400 hover:text-white transition-colors flex items-center gap-1 p-1 -ml-1 rounded-md hover:bg-gray-700/50"
+            title="Return to Home"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+            </svg>
+            <span className="hidden sm:inline text-sm font-medium">Home</span>
+          </button>
+        </div>
+
         <h2 className="text-xl font-bold text-center">JantzCard Study Session</h2>
         <div className="text-center text-sm text-gray-400 mt-1">{`Cards Remaining: ${queue.length}`}</div>
         
