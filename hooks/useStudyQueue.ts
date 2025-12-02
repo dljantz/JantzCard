@@ -1,6 +1,6 @@
 
 import { Card } from '../types';
-import { STUDY_INTERVALS } from '../constants';
+import { STUDY_INTERVALS, SORTING_FUZZINESS } from '../constants';
 
 // Create a lookup map for efficient access to interval milliseconds
 const intervalMap = new Map<string, number>(
@@ -48,20 +48,39 @@ export const calculateStudyQueue = (cards: Card[]): string[] => {
     return now >= dueTime;
   });
 
+  // Pre-calculate noisy scores to ensure stable sorting.
+  // Formula: noisyPO = PO * Random(1-fuzziness, 1+fuzziness)
+  const noisyScores = new Map<string, number>();
+
+  overdueCards.forEach(card => {
+    const po = getProportionalOverdueness(card, now);
+    
+    if (po === Infinity) {
+      // New cards remain at Infinite priority (top of list)
+      noisyScores.set(card.id, Infinity);
+    } else {
+      const min = 1 - SORTING_FUZZINESS;
+      const max = 1 + SORTING_FUZZINESS;
+      const randomFactor = Math.random() * (max - min) + min;
+      noisyScores.set(card.id, po * randomFactor);
+    }
+  });
+
   overdueCards.sort((a, b) => {
     // 1. Sort by priority level (lower is higher priority)
     if (a.priorityLevel !== b.priorityLevel) {
       return a.priorityLevel - b.priorityLevel;
     }
 
-    // 2. Sort by proportional overdueness (higher is more overdue)
-    const overduenessA = getProportionalOverdueness(a, now);
-    const overduenessB = getProportionalOverdueness(b, now);
+    // 2. Sort by Noisy PO (descending)
+    const scoreA = noisyScores.get(a.id)!;
+    const scoreB = noisyScores.get(b.id)!;
 
-    // Handle Infinity - Infinity = NaN case
-    if (overduenessA === overduenessB) return 0;
+    if (scoreA === scoreB) return 0;
+    if (scoreA === Infinity) return -1;
+    if (scoreB === Infinity) return 1;
     
-    return overduenessB - overduenessA;
+    return scoreB - scoreA;
   });
 
   return overdueCards.map(card => card.id);

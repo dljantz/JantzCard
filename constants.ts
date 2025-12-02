@@ -1,3 +1,4 @@
+
 import { StudyInterval } from "./types";
 
 export const STUDY_INTERVALS: StudyInterval[] = [
@@ -38,3 +39,6 @@ export const DEFAULT_CENTER_INTERVAL = '1hr';
 export const RED_INTERVAL_COLORS = ['#F00000', '#D81800', '#C03000', '#A84800', '#906000'];
 export const YELLOW_INTERVAL_COLOR = '#787800';
 export const GREEN_INTERVAL_COLORS = ['#607818', '#487830', '#307848', '#187860', '#007878'];
+
+// Sorting Configuration
+export const SORTING_FUZZINESS = 0.5; // Controls the "jitter" in study queue sorting (0.0 = strict, 0.5 = moderate noise)
