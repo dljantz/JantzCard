@@ -165,7 +165,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({ queue, currentCard, onCardUpd
             <span>New Card</span>
           ) : (
             <span>
-              The last study interval for this card was <span className="text-white font-bold">{parseFloat(overdueness.toPrecision(2))}</span> times longer than the intended interval
+              The last study interval for this card was <span className="text-white font-bold">{parseFloat(overdueness.toPrecision(2))}</span> times longer than your intended interval
             </span>
           )}
         </div>

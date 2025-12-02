@@ -12,7 +12,8 @@ import {
   updateCardInSheet, 
   extractSpreadsheetId, 
   batchUpdateCards, 
-  PendingCardUpdate 
+  PendingCardUpdate,
+  RowNotFoundError
 } from './services/sheetService';
 
 const BACKLOG_STORAGE_KEY = 'jantzcard_pending_sheet_updates';
@@ -204,35 +205,43 @@ const App: React.FC = () => {
                 await processBacklog(spreadsheetId, pendingUpdates);
             }
         } catch (sheetError: any) {
-            console.warn("Sheet update failed, adding to backlog.", sheetError);
             
-            // Extract a readable error message for logging/debugging
-            const errMsg = sheetError.result?.error?.message || sheetError.message || "Network request failed";
-            console.log("Reason:", errMsg);
+            // CRITICAL CHANGE: Check for RowNotFoundError
+            if (sheetError instanceof RowNotFoundError) {
+                console.warn("Card row deleted from Sheet during session. Discarding update to prevent zombie state.");
+                
+                // If this card happened to be in the backlog previously, remove it.
+                // It is not possible to save it, so we stop trying.
+                const newBacklog = pendingUpdates.filter(p => p.id !== updatedCard.id);
+                updateBacklog(newBacklog);
 
-            // Create pending update object
-            const pending: PendingCardUpdate = {
-                id: updatedCard.id,
-                lastSeen: updatedCard.lastSeen,
-                currentStudyInterval: updatedCard.currentStudyInterval
-            };
+                setSyncMessage("Sync skipped: Card deleted remotely.");
+            } else {
+                // For all other errors (Network, Auth, Rate Limit), treat as a transient failure and Backlog it.
+                console.warn("Sheet update failed, adding to backlog.", sheetError);
+                
+                const errMsg = sheetError.result?.error?.message || sheetError.message || "Network request failed";
+                console.log("Reason:", errMsg);
 
-            // Upsert into backlog
-            const newBacklog = [
-                ...pendingUpdates.filter(p => p.id !== pending.id),
-                pending
-            ];
-            updateBacklog(newBacklog);
-            
-            // We don't throw here. We've handled the "error" by caching it.
-            // The UI will update automatically because pendingUpdates.length > 0.
+                const pending: PendingCardUpdate = {
+                    id: updatedCard.id,
+                    lastSeen: updatedCard.lastSeen,
+                    currentStudyInterval: updatedCard.currentStudyInterval
+                };
+
+                const newBacklog = [
+                    ...pendingUpdates.filter(p => p.id !== pending.id),
+                    pending
+                ];
+                updateBacklog(newBacklog);
+            }
         }
       } else {
         await updateMockCard(updatedCard);
       }
       
-      // Clear generic sync messages on success loop
-      setSyncMessage(null);
+      // Clear generic sync messages on success loop (unless we just set a specific warning)
+      setSyncMessage(prev => prev === "Sync skipped: Card deleted remotely." ? prev : null);
 
     } catch (error: any) {
       console.error("Critical error in handleCardUpdate:", error);

@@ -1,6 +1,13 @@
 
 import { Card } from '../types';
 
+export class RowNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RowNotFoundError";
+  }
+}
+
 export interface PendingCardUpdate {
   id: string;
   lastSeen: string | null;
@@ -124,7 +131,7 @@ export const updateCardInSheet = async (spreadsheetId: string, card: Card): Prom
   const rowNumber = await findRowForCard(spreadsheetId, card);
 
   if (!rowNumber) {
-    throw new Error(`Could not find row for card ID: ${card.id}. Has the card been deleted from the sheet?`);
+    throw new RowNotFoundError(`Could not find row for card ID: ${card.id}. Has the card been deleted from the sheet?`);
   }
   
   // Update Columns E (Last Seen), F (Interval), and G (ID)
