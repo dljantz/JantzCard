@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Card, AppState, DataSource } from './types';
 import { calculateStudyQueue } from './hooks/useStudyQueue';
@@ -17,6 +16,15 @@ import {
 } from './services/sheetService';
 
 const BACKLOG_STORAGE_KEY = 'jantzcard_pending_sheet_updates';
+
+// Safely access environment variables to prevent crashes if import.meta.env is undefined
+const getEnvVar = (key: string) => {
+  const meta = import.meta as any;
+  return (meta && meta.env && meta.env[key]) || '';
+};
+
+const GOOGLE_API_KEY = getEnvVar('VITE_GOOGLE_API_KEY');
+const GOOGLE_CLIENT_ID = getEnvVar('VITE_GOOGLE_CLIENT_ID');
 
 // Temporary debugging helper to log queue state
 const logQueueToConsole = (queue: string[], cards: Card[]) => {
@@ -224,8 +232,13 @@ const App: React.FC = () => {
     }
   }, [dataSource, pendingUpdates, processBacklog]);
 
-  const handleGoogleLogin = useCallback(async (apiKey: string, clientId: string, silent: boolean = false) => {
-    const result = await initializeClient(apiKey, clientId);
+  const handleGoogleLogin = useCallback(async (silent: boolean = false) => {
+    if (!GOOGLE_API_KEY || !GOOGLE_CLIENT_ID) {
+      setAppError("Configuration Error: API Key or Client ID missing from environment variables.");
+      return;
+    }
+    
+    const result = await initializeClient(GOOGLE_API_KEY, GOOGLE_CLIENT_ID);
     if (result.success && !result.restored && !silent) {
       login();
     }
@@ -383,6 +396,7 @@ const App: React.FC = () => {
             isAuthLoading={isAuthLoading}
             isAuthReady={isReady}
             isLoadingCards={isSyncing && dataSource === DataSource.Sheet}
+            hasEnvConfig={!!(GOOGLE_API_KEY && GOOGLE_CLIENT_ID)}
           />
         );
     }
