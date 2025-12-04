@@ -1,4 +1,4 @@
-
+// this is a comment I'm definitely going to delete! It doesn't matter in the slightest!
 import React, { useState, useCallback, useEffect } from 'react';
 import { Card, AppState, DataSource } from './types';
 import { calculateStudyQueue } from './hooks/useStudyQueue';
@@ -7,11 +7,11 @@ import HomeScreen from './components/HomeScreen';
 import StudyScreen from './components/StudyScreen';
 import CompletionScreen from './components/CompletionScreen';
 import { getMockData, updateCard as updateMockCard } from './services/dataService';
-import { 
-  loadCardsFromSheet, 
-  updateCardInSheet, 
-  extractSpreadsheetId, 
-  batchUpdateCards, 
+import {
+  loadCardsFromSheet,
+  updateCardInSheet,
+  extractSpreadsheetId,
+  batchUpdateCards,
   PendingCardUpdate,
   RowNotFoundError
 } from './services/sheetService';
@@ -36,17 +36,17 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [appError, setAppError] = useState<string | null>(null);
-  
+
   // Backlog state for offline capability
   const [pendingUpdates, setPendingUpdates] = useState<PendingCardUpdate[]>([]);
 
   // Google Auth Hook
-  const { 
-    isReady, 
-    initializeClient, 
-    login, 
-    logout, 
-    currentUser, 
+  const {
+    isReady,
+    initializeClient,
+    login,
+    logout,
+    currentUser,
     error: authError,
     isLoading: isAuthLoading
   } = useGoogleAuth();
@@ -82,9 +82,9 @@ const App: React.FC = () => {
   // Attempt to flush the backlog to the sheet
   const processBacklog = useCallback(async (spreadsheetId: string, updates: PendingCardUpdate[]) => {
     if (updates.length === 0) return;
-    
+
     console.log(`Attempting to sync ${updates.length} pending updates...`);
-    
+
     try {
       await batchUpdateCards(spreadsheetId, updates);
       // Success: Clear backlog
@@ -100,7 +100,7 @@ const App: React.FC = () => {
   const handleStartSheetStudy = useCallback(async (sheetUrl: string) => {
     setAppError(null);
     setSyncMessage(null);
-    
+
     const spreadsheetId = extractSpreadsheetId(sheetUrl);
     if (!spreadsheetId) {
       setAppError("Invalid Sheet URL. Could not extract Spreadsheet ID.");
@@ -113,7 +113,7 @@ const App: React.FC = () => {
 
       // 1. Load fresh data
       const cardsData = await loadCardsFromSheet(spreadsheetId);
-      
+
       if (cardsData.length === 0) {
         setAppError("Found no cards in the sheet. Please ensure data starts at Row 2.");
         setIsSyncing(false);
@@ -126,15 +126,15 @@ const App: React.FC = () => {
       let cardsForQueue = [...cardsData];
       if (pendingUpdates.length > 0) {
         setSyncMessage(`Syncing ${pendingUpdates.length} offline updates...`);
-        
+
         // Merge local pending updates into the fresh data for the session
         cardsForQueue = cardsData.map(card => {
           const pending = pendingUpdates.find(p => p.id === card.id);
           if (pending) {
-            return { 
-              ...card, 
-              lastSeen: pending.lastSeen, 
-              currentStudyInterval: pending.currentStudyInterval 
+            return {
+              ...card,
+              lastSeen: pending.lastSeen,
+              currentStudyInterval: pending.currentStudyInterval
             };
           }
           return card;
@@ -147,7 +147,7 @@ const App: React.FC = () => {
       }
 
       const initialQueue = calculateStudyQueue(cardsForQueue);
-      
+
       if (initialQueue.length === 0) {
         setAppError("No overdue cards found! Check back later.");
         setIsSyncing(false);
@@ -161,7 +161,7 @@ const App: React.FC = () => {
       console.error(err);
       const msg = err.result?.error?.message || err.message || "Unknown error";
       setAppError("Failed to load cards: " + msg);
-      setDataSource(DataSource.Mock); 
+      setDataSource(DataSource.Mock);
     } finally {
       setIsSyncing(false);
     }
@@ -169,10 +169,10 @@ const App: React.FC = () => {
 
   const handleReloadDeck = useCallback(async () => {
     if (dataSource !== DataSource.Sheet) return;
-    
+
     const sheetUrl = localStorage.getItem('jantzcard_sheet_url');
     const spreadsheetId = sheetUrl ? extractSpreadsheetId(sheetUrl) : null;
-    
+
     if (!spreadsheetId) {
       setSyncMessage("Error: Could not find Sheet ID to reload.");
       return;
@@ -188,31 +188,31 @@ const App: React.FC = () => {
       }
 
       const cardsData = await loadCardsFromSheet(spreadsheetId);
-      
+
       if (cardsData.length === 0) {
         setSyncMessage("Reload returned 0 cards.");
       } else {
         // Merge any remaining pending updates (if sync failed)
         let finalCards = cardsData;
         if (pendingUpdates.length > 0) {
-            finalCards = cardsData.map(card => {
-              const pending = pendingUpdates.find(p => p.id === card.id);
-              if (pending) {
-                  return { 
-                    ...card, 
-                    lastSeen: pending.lastSeen, 
-                    currentStudyInterval: pending.currentStudyInterval 
-                  };
-              }
-              return card;
-            });
+          finalCards = cardsData.map(card => {
+            const pending = pendingUpdates.find(p => p.id === card.id);
+            if (pending) {
+              return {
+                ...card,
+                lastSeen: pending.lastSeen,
+                currentStudyInterval: pending.currentStudyInterval
+              };
+            }
+            return card;
+          });
         }
-        
+
         setAllCards(finalCards);
         const newQueue = calculateStudyQueue(finalCards);
         setSessionQueue(newQueue);
         logQueueToConsole(newQueue, finalCards);
-        
+
         setSyncMessage("Deck reloaded!");
         setTimeout(() => setSyncMessage(null), 2000);
       }
@@ -238,7 +238,7 @@ const App: React.FC = () => {
     setAllCards(newCards);
     const newQueue = calculateStudyQueue(newCards);
     setSessionQueue(newQueue);
-    
+
     // Log resulting queue
     logQueueToConsole(newQueue, newCards);
 
@@ -246,61 +246,61 @@ const App: React.FC = () => {
       if (dataSource === DataSource.Sheet) {
         const sheetUrl = localStorage.getItem('jantzcard_sheet_url');
         const spreadsheetId = sheetUrl ? extractSpreadsheetId(sheetUrl) : null;
-        
+
         if (!spreadsheetId) {
-             throw new Error("Spreadsheet ID lost.");
+          throw new Error("Spreadsheet ID lost.");
         }
 
         try {
-            // 1. Try to save the current card
-            await updateCardInSheet(spreadsheetId, updatedCard);
-            
-            // Success: Clear any persistent error messages (like "Sync skipped")
-            setSyncMessage(null);
-            
-            // 2. If successful, check if we need to flush the backlog
-            // Use the FRESH pendingUpdates from the ref/state if possible, but here we depend on the prop.
-            if (pendingUpdates.length > 0) {
-                // If the current save worked, we have connectivity. Try backlog.
-                await processBacklog(spreadsheetId, pendingUpdates);
-            }
+          // 1. Try to save the current card
+          await updateCardInSheet(spreadsheetId, updatedCard);
+
+          // Success: Clear any persistent error messages (like "Sync skipped")
+          setSyncMessage(null);
+
+          // 2. If successful, check if we need to flush the backlog
+          // Use the FRESH pendingUpdates from the ref/state if possible, but here we depend on the prop.
+          if (pendingUpdates.length > 0) {
+            // If the current save worked, we have connectivity. Try backlog.
+            await processBacklog(spreadsheetId, pendingUpdates);
+          }
         } catch (sheetError: any) {
-            
-            // CRITICAL CHANGE: Check for RowNotFoundError
-            if (sheetError instanceof RowNotFoundError) {
-                console.warn("Card row deleted from Sheet during session. Discarding update to prevent zombie state.");
-                
-                // If this card happened to be in the backlog previously, remove it.
-                // It is not possible to save it, so we stop trying.
-                const newBacklog = pendingUpdates.filter(p => p.id !== updatedCard.id);
-                updateBacklog(newBacklog);
 
-                setSyncMessage("Sync skipped: Card deleted remotely.");
-            } else {
-                // For all other errors (Network, Auth, Rate Limit), treat as a transient failure and Backlog it.
-                console.warn("Sheet update failed, adding to backlog.", sheetError);
-                
-                const errMsg = sheetError.result?.error?.message || sheetError.message || "Network request failed";
-                console.log("Reason:", errMsg);
+          // CRITICAL CHANGE: Check for RowNotFoundError
+          if (sheetError instanceof RowNotFoundError) {
+            console.warn("Card row deleted from Sheet during session. Discarding update to prevent zombie state.");
 
-                const pending: PendingCardUpdate = {
-                    id: updatedCard.id,
-                    lastSeen: updatedCard.lastSeen,
-                    currentStudyInterval: updatedCard.currentStudyInterval
-                };
+            // If this card happened to be in the backlog previously, remove it.
+            // It is not possible to save it, so we stop trying.
+            const newBacklog = pendingUpdates.filter(p => p.id !== updatedCard.id);
+            updateBacklog(newBacklog);
 
-                const newBacklog = [
-                    ...pendingUpdates.filter(p => p.id !== pending.id),
-                    pending
-                ];
-                updateBacklog(newBacklog);
-            }
+            setSyncMessage("Sync skipped: Card deleted remotely.");
+          } else {
+            // For all other errors (Network, Auth, Rate Limit), treat as a transient failure and Backlog it.
+            console.warn("Sheet update failed, adding to backlog.", sheetError);
+
+            const errMsg = sheetError.result?.error?.message || sheetError.message || "Network request failed";
+            console.log("Reason:", errMsg);
+
+            const pending: PendingCardUpdate = {
+              id: updatedCard.id,
+              lastSeen: updatedCard.lastSeen,
+              currentStudyInterval: updatedCard.currentStudyInterval
+            };
+
+            const newBacklog = [
+              ...pendingUpdates.filter(p => p.id !== pending.id),
+              pending
+            ];
+            updateBacklog(newBacklog);
+          }
         }
       } else {
         await updateMockCard(updatedCard);
         setSyncMessage(null);
       }
-      
+
     } catch (error: any) {
       console.error("Critical error in handleCardUpdate:", error);
       // This catch block handles system errors (like missing spreadsheet ID), 
@@ -314,11 +314,11 @@ const App: React.FC = () => {
   const handleFinishStudy = useCallback(() => {
     setAppState(AppState.Finished);
     if (dataSource === DataSource.Sheet && pendingUpdates.length > 0) {
-         setSyncMessage(`Session complete. Note: ${pendingUpdates.length} cards are saved to this device and will sync when online.`);
+      setSyncMessage(`Session complete. Note: ${pendingUpdates.length} cards are saved to this device and will sync when online.`);
     } else {
-         setSyncMessage(dataSource === DataSource.Sheet 
-            ? 'Session complete! All progress synced to Google Sheets.' 
-            : 'Session complete! Progress saved to local mock storage.');
+      setSyncMessage(dataSource === DataSource.Sheet
+        ? 'Session complete! All progress synced to Google Sheets.'
+        : 'Session complete! Progress saved to local mock storage.');
     }
   }, [dataSource, pendingUpdates.length]);
 
@@ -334,7 +334,7 @@ const App: React.FC = () => {
   const getSaveStatusMessage = () => {
     // Priority 1: Backlog Warning
     if (pendingUpdates.length > 0 && dataSource === DataSource.Sheet) {
-        return `Cloud Save Failed: ${pendingUpdates.length} card(s) saved to this device`;
+      return `Cloud Save Failed: ${pendingUpdates.length} card(s) saved to this device`;
     }
     // Priority 2: Generic Sync/System Messages
     return syncMessage;
@@ -344,7 +344,7 @@ const App: React.FC = () => {
     switch (appState) {
       case AppState.Studying: {
         const currentCardId = sessionQueue[0];
-        const currentCard = currentCardId !== undefined 
+        const currentCard = currentCardId !== undefined
           ? allCards.find(c => c.id === currentCardId) || null
           : null;
 
@@ -373,7 +373,7 @@ const App: React.FC = () => {
       case AppState.Home:
       default:
         return (
-          <HomeScreen 
+          <HomeScreen
             onStartMock={handleStartMockStudy}
             onStartSheet={handleStartSheetStudy}
             onGoogleLogin={handleGoogleLogin}
