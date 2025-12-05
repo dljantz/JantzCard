@@ -31,12 +31,12 @@ const Flashcard: React.FC<FlashcardProps> = ({ card, isFlipped }) => {
           - `gridArea: 'card'` places it in the defined grid area.
           - `backface-visibility: hidden` makes it invisible when it's facing away from the screen.
         */}
-        <div 
-          style={{ gridArea: 'card' }} 
+        <div
+          style={{ gridArea: 'card' }}
           className={`${faceClasses} [backface-visibility:hidden] bg-gray-800 border-gray-700`}
         >
           <p className="text-gray-400 text-sm mb-2">Priority: {displayPriority}</p>
-          <p className="text-2xl md:text-4xl text-center text-gray-100 font-['Merriweather',_serif]">{card.front}</p>
+          <p className="text-2xl md:text-4xl text-center text-gray-100 font-['Merriweather',_serif] whitespace-pre-wrap">{card.front}</p>
         </div>
 
         {/* 
@@ -44,13 +44,13 @@ const Flashcard: React.FC<FlashcardProps> = ({ card, isFlipped }) => {
           - Also placed in the 'card' grid area to overlay it perfectly on the front.
           - It's pre-rotated 180 degrees so it's initially facing away.
         */}
-        <div 
-          style={{ gridArea: 'card' }} 
+        <div
+          style={{ gridArea: 'card' }}
           className={`${faceClasses} [backface-visibility:hidden] [transform:rotateY(180deg)] bg-blue-900/50 border-blue-700`}
         >
-           <div className="w-full h-full flex flex-col items-center justify-center overflow-auto">
-             <p className="text-2xl md:text-4xl text-center font-semibold text-teal-300 font-['Merriweather',_serif]">{card.back}</p>
-           </div>
+          <div className="w-full h-full flex flex-col items-center justify-center overflow-auto">
+            <p className="text-2xl md:text-4xl text-center font-semibold text-teal-300 font-['Merriweather',_serif] whitespace-pre-wrap">{card.back}</p>
+          </div>
         </div>
       </div>
     </div>
