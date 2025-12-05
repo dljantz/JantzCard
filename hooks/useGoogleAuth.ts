@@ -11,7 +11,7 @@ declare global {
 }
 
 const DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.profile';
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.file';
 const TOKEN_STORAGE_KEY = 'jantzcard_google_token';
 const EXPIRY_STORAGE_KEY = 'jantzcard_token_expiry';
 

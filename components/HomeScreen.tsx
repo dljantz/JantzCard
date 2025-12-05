@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleUser } from '../types';
+import { DeckHistoryItem } from '../services/driveService';
 
 interface HomeScreenProps {
   onStartMock: () => void;
@@ -12,6 +12,7 @@ interface HomeScreenProps {
   isAuthLoading: boolean;
   isAuthReady: boolean;
   isLoadingCards: boolean;
+  recentDecks: DeckHistoryItem[];
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -23,7 +24,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   authError,
   isAuthLoading,
   isAuthReady,
-  isLoadingCards
+  isLoadingCards,
+  recentDecks
 }) => {
   // Sheet Verification State
   const [sheetUrl, setSheetUrl] = useState('');
@@ -186,6 +188,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Recent Decks */}
+              {recentDecks.length > 0 && (
+                <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-600 text-left space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-200 border-b border-gray-700 pb-2">Recent Decks</h3>
+                  <div className="space-y-2">
+                    {recentDecks.map((deck) => (
+                      <button
+                        key={deck.spreadsheetId}
+                        onClick={() => onStartSheet(`https://docs.google.com/spreadsheets/d/${deck.spreadsheetId}`)}
+                        className="w-full text-left p-3 hover:bg-gray-800 rounded border border-gray-700 hover:border-blue-500 transition-all group"
+                      >
+                        <div className="font-medium text-blue-400 group-hover:text-blue-300">{deck.name || 'Untitled Deck'}</div>
+                        <div className="text-xs text-gray-500">Last visited: {new Date(deck.lastVisited).toLocaleDateString()}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-col gap-3">
                 <button

@@ -14,6 +14,7 @@ import {
   PendingCardUpdate,
   RowNotFoundError
 } from './services/sheetService';
+import { addToHistory, getHistory, DeckHistoryItem } from './services/driveService';
 
 const BACKLOG_STORAGE_KEY = 'jantzcard_pending_sheet_updates';
 
@@ -38,6 +39,7 @@ const App: React.FC = () => {
 
   // Backlog state for offline capability
   const [pendingUpdates, setPendingUpdates] = useState<PendingCardUpdate[]>([]);
+  const [recentDecks, setRecentDecks] = useState<DeckHistoryItem[]>([]);
 
   // Google Auth Hook
   const {
@@ -61,6 +63,17 @@ const App: React.FC = () => {
       }
     }
   }, []);
+
+  // Fetch recent history when user logs in
+  useEffect(() => {
+    if (currentUser) {
+      getHistory().then(history => {
+        setRecentDecks(history);
+      });
+    } else {
+      setRecentDecks([]);
+    }
+  }, [currentUser]);
 
   // Helper to persist backlog changes
   const updateBacklog = (newBacklog: PendingCardUpdate[]) => {
@@ -159,6 +172,17 @@ const App: React.FC = () => {
       setSessionQueue(initialQueue);
       logQueueToConsole(initialQueue, cardsForQueue);
       setAppState(AppState.Studying);
+
+      // Add to remote history
+      const historyItem: DeckHistoryItem = {
+        spreadsheetId,
+        name: 'Study Deck', // We could fetch the sheet title if we wanted to be fancy, but static for now
+        lastVisited: Date.now()
+      };
+      addToHistory(historyItem).then(updatedHistory => {
+        setRecentDecks(updatedHistory);
+      });
+
     } catch (err: any) {
       console.error(err);
       const msg = err.result?.error?.message || err.message || "Unknown error";
@@ -385,6 +409,7 @@ const App: React.FC = () => {
             isAuthLoading={isAuthLoading}
             isAuthReady={isReady}
             isLoadingCards={isSyncing && dataSource === DataSource.Sheet}
+            recentDecks={recentDecks}
           />
         );
     }
