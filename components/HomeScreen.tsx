@@ -29,17 +29,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
   // Sheet Verification State
   const [sheetUrl, setSheetUrl] = useState('');
-  const [verificationResult, setVerificationResult] = useState<{ value: string, timestamp: string } | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [sheetError, setSheetError] = useState<string | null>(null);
 
   const hasAttemptedAutoLogin = useRef(false);
-
-  // Load saved sheet URL on mount
-  useEffect(() => {
-    const savedSheetUrl = localStorage.getItem('jantzcard_sheet_url');
-    if (savedSheetUrl) setSheetUrl(savedSheetUrl);
-  }, []);
 
   // Attempt auto-login if auth is ready
   useEffect(() => {
@@ -68,50 +59,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     onGoogleLogin(apiKey, clientId, false);
   };
 
-  const handleVerifyConnection = async () => {
-    setSheetError(null);
-    setVerificationResult(null);
-    setIsVerifying(true);
-
-    // Regex to extract ID
-    // Standard URL: https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit#gid=0
-    const matches = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-    const spreadsheetId = matches ? matches[1] : null;
-
-    if (!spreadsheetId) {
-      setSheetError("Could not extract Spreadsheet ID from URL. Please ensure it is a valid Google Sheets URL.");
-      setIsVerifying(false);
-      return;
-    }
-
-    localStorage.setItem('jantzcard_sheet_url', sheetUrl);
-
-    try {
-      const gapi = (window as any).gapi;
-      if (!gapi?.client?.sheets) {
-        throw new Error("Google Sheets API not initialized. If you just enabled the API, please refresh the page and sign in again.");
-      }
-
-      const response = await gapi.client.sheets.spreadsheets.values.get({
-        spreadsheetId: spreadsheetId,
-        range: 'Deck!A1'
-      });
-
-      const cellValue = response.result.values?.[0]?.[0] ?? "(Empty Cell)";
-      setVerificationResult({
-        value: cellValue,
-        timestamp: new Date().toLocaleTimeString()
-      });
-
-    } catch (err: any) {
-      console.error(err);
-      const msg = err.result?.error?.message || err.message || "Unknown error occurred";
-      setSheetError(msg);
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
   return (
     <main className="flex-grow flex flex-col items-center justify-center p-4 text-center overflow-auto">
       <div className="max-w-2xl w-full">
@@ -135,7 +82,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
               {/* Sheet Configuration Area */}
               <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-600 text-left space-y-4">
-                <h3 className="text-lg font-semibold text-gray-200 border-b border-gray-700 pb-2">Data Source</h3>
+                <h3 className="text-lg font-semibold text-gray-200 border-b border-gray-700 pb-2">Connect New Study Deck</h3>
 
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">Google Sheet URL</label>
@@ -147,38 +94,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       placeholder="https://docs.google.com/spreadsheets/d/..."
                       className="flex-grow bg-gray-800 border border-gray-600 rounded p-2 text-white text-sm focus:border-blue-500 focus:outline-none"
                     />
-                    <button
-                      onClick={handleVerifyConnection}
-                      disabled={isVerifying || !sheetUrl}
-                      className={`bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded text-sm transition-colors flex-shrink-0 ${isVerifying ? 'opacity-50' : ''}`}
-                    >
-                      {isVerifying ? 'Checking...' : 'Check Deck!A1'}
-                    </button>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">Paste the URL of a sheet you have access to. It must have a tab named <strong>Deck</strong>.</p>
                 </div>
 
-                {/* Verification Result */}
-                {verificationResult && (
-                  <div className="bg-green-900/20 border border-green-800 p-3 rounded text-sm animate-fade-in">
-                    <p className="text-green-400 font-bold mb-1">✓ Connection Verified</p>
-                    <p className="text-gray-300">
-                      Content of cell <span className="font-mono bg-gray-800 px-1 rounded text-white">Deck!A1</span>:
-                    </p>
-                    <p className="text-xl text-white font-mono mt-2 p-2 bg-gray-800 rounded border border-gray-700 break-all">
-                      {verificationResult.value}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1 text-right">Checked at {verificationResult.timestamp}</p>
-                  </div>
-                )}
 
-                {/* Error Display */}
-                {sheetError && (
-                  <div className="bg-red-900/20 border border-red-800 p-3 rounded text-sm text-red-300 break-words">
-                    <p className="font-bold">Error:</p>
-                    <p>{sheetError}</p>
-                  </div>
-                )}
 
                 {/* Auth Error passed from Parent */}
                 {authError && (
