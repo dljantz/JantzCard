@@ -182,10 +182,11 @@ const findRowForCard = async (spreadsheetId: string, card: Card, mapping: Column
   }
 
   // Fallback: Search by Content
-  const foundIndex = rows.findIndex((row: any[]) =>
-    row[mapping.Front] === card.front &&
-    row[mapping.Back] === card.back
-  );
+  const foundIndex = rows.findIndex((row: any[]) => {
+    const sheetFront = row[mapping.Front] ?? '';
+    const sheetBack = row[mapping.Back] ?? '';
+    return sheetFront === card.front && sheetBack === card.back;
+  });
 
   return foundIndex !== -1 ? foundIndex + 2 : null;
 };
