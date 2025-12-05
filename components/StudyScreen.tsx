@@ -19,23 +19,23 @@ interface StudyScreenProps {
   saveError: string | null;
 }
 
-const StudyScreen: React.FC<StudyScreenProps> = ({ 
-  queue, 
-  currentCard, 
-  onCardUpdate, 
-  onFinish, 
-  onExit, 
+const StudyScreen: React.FC<StudyScreenProps> = ({
+  queue,
+  currentCard,
+  onCardUpdate,
+  onFinish,
+  onExit,
   onReload,
-  isSaving, 
-  dataSource, 
-  saveError 
+  isSaving,
+  dataSource,
+  saveError
 }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [preselectedInterval, setPreselectedInterval] = useState<string | null>(null);
 
   // Transition state to hold the previous card's back content during animation
   const [transitionBack, setTransitionBack] = useState<string | null>(null);
-  
+
   // Refs to track state without triggering effect re-runs prematurely
   const previousCardRef = useRef<Card | null>(null);
   const isFlippedRef = useRef(isFlipped);
@@ -49,7 +49,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
   useEffect(() => {
     // Check if the card identity has changed (e.g. moved to next card)
     if (currentCard?.id !== previousCardRef.current?.id) {
-      
+
       const wasFlipped = isFlippedRef.current;
       const prevCard = previousCardRef.current;
 
@@ -63,7 +63,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
         setPreselectedInterval(null);
 
         // Clear the override after the CSS transition finishes (700ms matches Flashcard CSS)
-        const timer = setTimeout(() => {
+        setTimeout(() => {
           setTransitionBack(null);
         }, 700);
 
@@ -138,9 +138,9 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
     }
     return currentCard;
   }, [currentCard, transitionBack]);
-  
+
   if (!currentCard || !displayCard) {
-     return (
+    return (
       <div className="flex-grow flex items-center justify-center">
         <p className="text-2xl">{queue.length > 0 ? 'Loading card...' : 'Completing session...'}</p>
       </div>
@@ -148,7 +148,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
   }
 
   const overdueness = getProportionalOverdueness(currentCard, Date.now());
-  
+
   // Safe check for string existence before includes
   const isSavedLocallyWarning = saveError && saveError.includes && saveError.includes('saved to this device');
 
@@ -156,7 +156,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
     <div className="flex flex-col h-screen overflow-hidden">
       <header className="p-4 bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 relative">
         <div className="absolute top-4 left-4 z-20 flex gap-2">
-          <button 
+          <button
             onClick={onExit}
             className="text-gray-400 hover:text-white transition-colors flex items-center gap-1 p-1 -ml-1 rounded-md hover:bg-gray-700/50"
             title="Return to Home"
@@ -166,9 +166,9 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
             </svg>
             <span className="hidden sm:inline text-sm font-medium">Home</span>
           </button>
-          
+
           {dataSource === DataSource.Sheet && (
-             <button 
+            <button
               onClick={onReload}
               disabled={isSaving}
               className={`text-gray-400 hover:text-white transition-colors flex items-center gap-1 p-1 rounded-md hover:bg-gray-700/50 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -184,7 +184,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
 
         <h2 className="text-xl font-bold text-center">JantzCard Study Session</h2>
         <div className="text-center text-sm text-gray-400 mt-1">{`Cards Remaining: ${queue.length}`}</div>
-        
+
         <div className="text-center text-xs text-blue-200/70 mt-2 font-medium tracking-wide">
           {overdueness === Infinity ? (
             <span>New Card</span>
@@ -194,7 +194,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
             </span>
           )}
         </div>
-        
+
         <div className="absolute top-1/2 right-4 -translate-y-1/2 flex items-center space-x-2 text-xs md:text-sm">
           {isSaving ? (
             <div className="flex items-center space-x-2 text-gray-400">
@@ -205,29 +205,29 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
               <span>Saving...</span>
             </div>
           ) : saveError ? (
-            <span 
-                className={`flex items-center gap-1 font-semibold ${isSavedLocallyWarning ? 'text-orange-400' : 'text-red-400 animate-pulse'}`} 
-                title={saveError}
+            <span
+              className={`flex items-center gap-1 font-semibold ${isSavedLocallyWarning ? 'text-orange-400' : 'text-red-400 animate-pulse'}`}
+              title={saveError}
             >
-               {isSavedLocallyWarning ? (
-                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                   </svg>
-               ) : (
-                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                   </svg>
-               )}
-               <span>{saveError}</span>
+              {isSavedLocallyWarning ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              )}
+              <span>{saveError}</span>
             </span>
           ) : (
             <span className="text-gray-400 flex items-center gap-1 transition-opacity duration-500">
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-               </svg>
-               {dataSource === DataSource.Sheet 
-                  ? "All study progress saved to Google Sheets" 
-                  : "All study progress saved locally"}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              {dataSource === DataSource.Sheet
+                ? "All study progress saved to Google Sheets"
+                : "All study progress saved locally"}
             </span>
           )}
         </div>

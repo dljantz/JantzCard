@@ -3,7 +3,6 @@ import { GoogleUser } from '../types';
 import { DeckHistoryItem } from '../services/driveService';
 
 interface HomeScreenProps {
-  onStartMock: () => void;
   onStartSheet: (url: string) => void;
   onGoogleLogin: (apiKey: string, clientId: string, silent?: boolean) => void;
   onGoogleLogout: () => void;
@@ -16,7 +15,6 @@ interface HomeScreenProps {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
-  onStartMock,
   onStartSheet,
   onGoogleLogin,
   onGoogleLogout,
