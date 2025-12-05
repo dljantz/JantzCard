@@ -14,6 +14,7 @@ const DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4'
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.file';
 const TOKEN_STORAGE_KEY = 'jantzcard_google_token';
 const EXPIRY_STORAGE_KEY = 'jantzcard_token_expiry';
+const USER_EMAIL_KEY = 'jantzcard_user_email';
 
 export const useGoogleAuth = () => {
   const [isGapiLoaded, setIsGapiLoaded] = useState(false);
@@ -163,9 +164,16 @@ export const useGoogleAuth = () => {
       if (!userInfoRes.ok) throw new Error('Failed to fetch user profile');
 
       const userInfo = await userInfoRes.json();
+
+      // Cache email for smart login
+      if (userInfo.email) {
+        localStorage.setItem(USER_EMAIL_KEY, userInfo.email);
+      }
+
       setCurrentUser({
         name: userInfo.name,
         picture: userInfo.picture,
+        email: userInfo.email
       });
       setError(null);
     } catch (err) {
@@ -175,9 +183,19 @@ export const useGoogleAuth = () => {
     }
   };
 
-  const login = useCallback(() => {
+  const login = useCallback((forceConsent: boolean = false) => {
     if (tokenClientRef.current) {
-      tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
+      const storedEmail = localStorage.getItem(USER_EMAIL_KEY);
+
+      const config: any = {
+        prompt: forceConsent ? 'consent' : '', // Empty string = no enforced prompt (standard)
+      };
+
+      if (storedEmail && !forceConsent) {
+        config.login_hint = storedEmail;
+      }
+
+      tokenClientRef.current.requestAccessToken(config);
     } else {
       setError('Client not initialized. Please enter API credentials.');
     }
@@ -191,11 +209,13 @@ export const useGoogleAuth = () => {
         setCurrentUser(null);
         localStorage.removeItem(TOKEN_STORAGE_KEY);
         localStorage.removeItem(EXPIRY_STORAGE_KEY);
+        localStorage.removeItem(USER_EMAIL_KEY); // Clean up email on explicit logout
       });
     } else {
       setCurrentUser(null);
       localStorage.removeItem(TOKEN_STORAGE_KEY);
       localStorage.removeItem(EXPIRY_STORAGE_KEY);
+      localStorage.removeItem(USER_EMAIL_KEY);
     }
   }, []);
 
