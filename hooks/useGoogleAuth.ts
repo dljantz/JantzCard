@@ -18,9 +18,9 @@ const EXPIRY_STORAGE_KEY = 'jantzcard_token_expiry';
 export const useGoogleAuth = () => {
   const [isGapiLoaded, setIsGapiLoaded] = useState(false);
   const [isGisLoaded, setIsGisLoaded] = useState(false);
-  
+
   const tokenClientRef = useRef<any>(null);
-  
+
   const [currentUser, setCurrentUser] = useState<GoogleUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -70,7 +70,13 @@ export const useGoogleAuth = () => {
         discoveryDocs: [DISCOVERY_DOC],
       });
     } catch (gapiErr: any) {
-      console.warn('Non-blocking Error: GAPI client init failed. This likely means the Google Sheets API is not enabled on your project yet. You can still test Authentication.', gapiErr);
+      console.error('GAPI client init failed', gapiErr);
+      // CRITICAL CHANGE: Surface this error so the user knows why Sheets won't work.
+      // This is often due to API Key restrictions (Referrer).
+      const msg = gapiErr?.result?.error?.message || gapiErr?.message || JSON.stringify(gapiErr);
+      setError(`Google Sheets API failed to load: ${msg}`);
+      // We do NOT return here, because we still want to try loading the Auth/Identity client
+      // so the user can at least sign in (even if they can't fetch sheets yet).
     }
 
     // 2. Initialize Identity Services Token Client (The "Auth" Layer)
@@ -80,6 +86,19 @@ export const useGoogleAuth = () => {
         scope: SCOPES,
         callback: async (tokenResponse: any) => {
           if (tokenResponse && tokenResponse.access_token) {
+            // Verify we got the scopes we asked for
+            // Note: google.accounts.oauth2.hasGrantedAllScopes is the standard way, 
+            // but we can also check tokenResponse.scope (space-separated string)
+            const hasSheetsScope = window.google.accounts.oauth2.hasGrantedAllScopes(
+              tokenResponse,
+              'https://www.googleapis.com/auth/spreadsheets'
+            );
+
+            if (!hasSheetsScope) {
+              setError("Insufficient Permissions: You must grant access to Google Sheets to use this app.");
+              return;
+            }
+
             // Save token to localStorage
             const expiresIn = tokenResponse.expires_in || 3599; // Default to 1 hour
             const expirationTime = Date.now() + (expiresIn * 1000);
@@ -106,24 +125,24 @@ export const useGoogleAuth = () => {
 
       if (storedToken && storedExpiry) {
         if (Date.now() < parseInt(storedExpiry, 10)) {
-           window.gapi.client.setToken({ access_token: storedToken });
-           try {
-             // Validate token by fetching profile
-             await fetchUserProfile(storedToken);
-             restored = true;
-           } catch (e) {
-             // Token invalid or network error, clear storage
-             console.warn("Failed to restore session", e);
-             localStorage.removeItem(TOKEN_STORAGE_KEY);
-             localStorage.removeItem(EXPIRY_STORAGE_KEY);
-           }
+          window.gapi.client.setToken({ access_token: storedToken });
+          try {
+            // Validate token by fetching profile
+            await fetchUserProfile(storedToken);
+            restored = true;
+          } catch (e) {
+            // Token invalid or network error, clear storage
+            console.warn("Failed to restore session", e);
+            localStorage.removeItem(TOKEN_STORAGE_KEY);
+            localStorage.removeItem(EXPIRY_STORAGE_KEY);
+          }
         } else {
-           // Expired
-           localStorage.removeItem(TOKEN_STORAGE_KEY);
-           localStorage.removeItem(EXPIRY_STORAGE_KEY);
+          // Expired
+          localStorage.removeItem(TOKEN_STORAGE_KEY);
+          localStorage.removeItem(EXPIRY_STORAGE_KEY);
         }
       }
-      
+
       setIsLoading(false);
       return { success: true, restored };
 
@@ -140,7 +159,7 @@ export const useGoogleAuth = () => {
       const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (!userInfoRes.ok) throw new Error('Failed to fetch user profile');
 
       const userInfo = await userInfoRes.json();
@@ -174,9 +193,9 @@ export const useGoogleAuth = () => {
         localStorage.removeItem(EXPIRY_STORAGE_KEY);
       });
     } else {
-        setCurrentUser(null);
-        localStorage.removeItem(TOKEN_STORAGE_KEY);
-        localStorage.removeItem(EXPIRY_STORAGE_KEY);
+      setCurrentUser(null);
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      localStorage.removeItem(EXPIRY_STORAGE_KEY);
     }
   }, []);
 

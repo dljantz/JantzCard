@@ -35,7 +35,7 @@ export const STUDY_INTERVALS: StudyInterval[] = [
 ];
 
 // Constants for IntervalSelector
-export const DEFAULT_CENTER_INTERVAL = '1hr';
+export const DEFAULT_CENTER_INTERVAL = '1d';
 export const RED_INTERVAL_COLORS = ['#F00000', '#D81800', '#C03000', '#A84800', '#906000'];
 export const YELLOW_INTERVAL_COLOR = '#787800';
 export const GREEN_INTERVAL_COLORS = ['#607818', '#487830', '#307848', '#187860', '#007878'];
