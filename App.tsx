@@ -1,4 +1,3 @@
-// this is a comment I'm definitely going to delete! It doesn't matter in the slightest!
 import React, { useState, useCallback, useEffect } from 'react';
 import { Card, AppState, DataSource } from './types';
 import { calculateStudyQueue } from './hooks/useStudyQueue';
