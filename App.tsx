@@ -11,6 +11,7 @@ import {
   updateCardInSheet,
   extractSpreadsheetId,
   batchUpdateCards,
+  getSpreadsheetTitle,
   PendingCardUpdate,
   RowNotFoundError
 } from './services/sheetService';
@@ -174,9 +175,16 @@ const App: React.FC = () => {
       setAppState(AppState.Studying);
 
       // Add to remote history
+      let deckName = 'Study Deck';
+      try {
+        deckName = await getSpreadsheetTitle(spreadsheetId);
+      } catch (e) {
+        console.warn("Could not fetch deck title, using default.");
+      }
+
       const historyItem: DeckHistoryItem = {
         spreadsheetId,
-        name: 'Study Deck', // We could fetch the sheet title if we wanted to be fancy, but static for now
+        name: deckName,
         lastVisited: Date.now()
       };
       addToHistory(historyItem).then(updatedHistory => {

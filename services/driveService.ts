@@ -9,6 +9,7 @@ export interface DeckHistoryItem {
 }
 
 export interface HistoryFileContent {
+    _readme?: string;
     recentDecks: DeckHistoryItem[];
 }
 
@@ -51,6 +52,7 @@ export const createConfigFile = async (): Promise<string> => {
     };
 
     const content = {
+        _readme: "This file stores your JantzCard session history. Please do not edit it manually.",
         recentDecks: []
     };
 
@@ -136,7 +138,10 @@ export const addToHistory = async (deck: DeckHistoryItem): Promise<DeckHistoryIt
     // Limit to 10 items
     if (history.length > 10) history = history.slice(0, 10);
 
-    await updateConfigFile(fileId, { recentDecks: history });
+    await updateConfigFile(fileId, {
+        _readme: currentData._readme || "This file stores your JantzCard session history. Please do not edit it manually.",
+        recentDecks: history
+    });
     return history;
 };
 

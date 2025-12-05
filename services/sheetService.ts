@@ -23,6 +23,25 @@ export const extractSpreadsheetId = (url: string): string | null => {
 };
 
 /**
+ * Fetches the title of the spreadsheet.
+ */
+export const getSpreadsheetTitle = async (spreadsheetId: string): Promise<string> => {
+  if (!window.gapi?.client?.sheets) {
+    return "Unknown Deck";
+  }
+  try {
+    const response = await window.gapi.client.sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: 'properties.title'
+    });
+    return response.result.properties?.title || "Untitled Deck";
+  } catch (e) {
+    console.error("Failed to fetch sheet title", e);
+    return "Study Deck";
+  }
+};
+
+/**
  * Generates a unique ID for cards that don't have one.
  */
 const generateUniqueId = (): string => {
