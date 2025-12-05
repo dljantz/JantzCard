@@ -106,6 +106,9 @@ const App: React.FC = () => {
       return;
     }
 
+    // Persist the URL so it's available for future reloads/saves
+    localStorage.setItem('jantzcard_sheet_url', sheetUrl);
+
     setIsSyncing(true);
     try {
       setDataSource(DataSource.Sheet);
