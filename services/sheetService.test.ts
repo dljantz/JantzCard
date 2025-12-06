@@ -1,6 +1,6 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { batchUpdateCards, PendingCardUpdate } from './sheetService';
+import { batchUpdateCards, updateCardInSheet, PendingCardUpdate, RowNotFoundError } from './sheetService';
 
 // Mock GAPI
 const mockBatchUpdate = vi.fn();
@@ -91,8 +91,6 @@ describe('Conflict Resolution', () => {
 
         await batchUpdateCards('sheet-id', [update]);
 
-        // Should NOT call batchUpdate if all updates are skipped
-        // Wait, batchUpdateCards calls batchUpdate only if data > 0.
         expect(mockBatchUpdate).not.toHaveBeenCalled();
     });
 
@@ -105,6 +103,7 @@ describe('Conflict Resolution', () => {
         });
 
         // Mock current rows
+        // Row 2: ID="123", Updated="2024-01-01T00:00:00Z" "123"
         mockGet.mockResolvedValueOnce({
             result: {
                 values: [
@@ -123,5 +122,73 @@ describe('Conflict Resolution', () => {
         await batchUpdateCards('sheet-id', [update]);
 
         expect(mockBatchUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should handle numeric IDs from sheet gracefully in batchUpdateCards', async () => {
+        // Mock getColumnMapping response
+        mockGet.mockResolvedValueOnce({
+            result: {
+                values: [['Front', 'Back', 'ID']]
+            }
+        });
+
+        // Mock current rows
+        // Row 2: ID=123 (Number)
+        mockGet.mockResolvedValueOnce({
+            result: {
+                values: [
+                    ['Front A', 'Back A', 123]
+                ]
+            }
+        });
+
+        const update: PendingCardUpdate = {
+            id: '123', // String
+            lastSeen: 'now',
+            currentStudyInterval: '1d',
+            updatedAt: '2024-01-01T00:00:00Z'
+        };
+
+        await batchUpdateCards('sheet-id', [update]);
+
+        expect(mockBatchUpdate).toHaveBeenCalled();
+        const callArgs = mockBatchUpdate.mock.calls[0][0];
+        const data = callArgs.resource.data;
+        // ID column is C/col 2.
+        const idColUpdate = data.find((d: any) => d.range.includes('C2'));
+        expect(idColUpdate).toBeDefined();
+        // Should re-affirm ID (which we are sending as string, but matching worked)
+    });
+
+    it('should handle numeric IDs gracefully in updateCardInSheet', async () => {
+        // Mock getColumnMapping response
+        mockGet.mockResolvedValueOnce({
+            result: {
+                values: [['Front', 'Back', 'ID']]
+            }
+        });
+
+        // Mock current rows/findRowForCard (it fetches A2:ZZ)
+        mockGet.mockResolvedValueOnce({
+            result: {
+                values: [
+                    ['Front A', 'Back A', 123] // Numeric ID
+                ]
+            }
+        });
+
+        const card = {
+            id: '123', // String ID
+            front: 'Front A',
+            back: 'Back A',
+            lastSeen: 'now',
+            currentStudyInterval: '1d',
+            updatedAt: '2024-01-01T00:00:00Z'
+        } as any;
+
+        await updateCardInSheet('sheet-id', card);
+
+        expect(mockBatchUpdate).toHaveBeenCalled();
+        // If it failed to find row, it would have thrown RowNotFoundError
     });
 });

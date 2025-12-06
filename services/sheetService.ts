@@ -146,6 +146,9 @@ export const loadCardsFromSheet = async (spreadsheetId: string): Promise<Card[]>
       id = generateUniqueId();
     }
 
+    // Enforce string ID to avoid type mismatches
+    id = String(id);
+
     // Logic for Priority
     const parsedPriority = parseInt(getVal(mapping.Priority));
     const priorityLevel = isNaN(parsedPriority) ? Number.MAX_SAFE_INTEGER : parsedPriority;
@@ -180,15 +183,15 @@ const findRowForCard = async (spreadsheetId: string, card: Card, mapping: Column
   // Search by ID first
   if (mapping.ID !== undefined) {
     const idIndex = mapping.ID;
-    const foundIndex = rows.findIndex((row: any[]) => row[idIndex] === card.id);
+    const foundIndex = rows.findIndex((row: any[]) => String(row[idIndex]) === String(card.id));
     if (foundIndex !== -1) return foundIndex + 2;
   }
 
   // Fallback: Search by Content
   const foundIndex = rows.findIndex((row: any[]) => {
-    const sheetFront = row[mapping.Front] ?? '';
-    const sheetBack = row[mapping.Back] ?? '';
-    return sheetFront === card.front && sheetBack === card.back;
+    const sheetFront = String(row[mapping.Front] ?? '').trim();
+    const sheetBack = String(row[mapping.Back] ?? '').trim();
+    return sheetFront === card.front.trim() && sheetBack === card.back.trim();
   });
 
   return foundIndex !== -1 ? foundIndex + 2 : null;
@@ -206,6 +209,8 @@ export const updateCardInSheet = async (spreadsheetId: string, card: Card): Prom
   const rowNumber = await findRowForCard(spreadsheetId, card, mapping);
 
   if (!rowNumber) {
+    console.warn(`RowNotFoundError Debug: ID '${card.id}' not found. Searched using mapping:`, mapping);
+    // Optional: could log more details about what WAS found if needed, but that might spam.
     throw new RowNotFoundError(`Could not find row for card ID: ${card.id}.`);
   }
 
@@ -294,7 +299,7 @@ export const batchUpdateCards = async (spreadsheetId: string, updates: PendingCa
 
     // Find row by ID
     if (mapping.ID !== undefined) {
-      rowIndex = rows.findIndex((row: any[]) => row[mapping.ID!] === update.id);
+      rowIndex = rows.findIndex((row: any[]) => String(row[mapping.ID!]) === String(update.id));
     }
 
     if (rowIndex !== -1) {
