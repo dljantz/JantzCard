@@ -7,6 +7,7 @@ export interface Card {
   currentStudyInterval: string | null;
   lastSeen: string | null; // ISO 8601 string
   priorityLevel: number;
+  updatedAt?: string; // ISO 8601 string
   status?: string;
 }
 

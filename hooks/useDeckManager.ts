@@ -193,6 +193,8 @@ export const useDeckManager = (): UseDeckManagerReturn => {
 
     const updateCard = useCallback(async (updatedCard: Card) => {
         setIsLoading(true);
+        // Inject timestamp for conflict resolution
+        updatedCard.updatedAt = new Date().toISOString();
 
         // Optimistic Update
         const newCards = cards.map(c => c.id === updatedCard.id ? updatedCard : c);
@@ -222,7 +224,8 @@ export const useDeckManager = (): UseDeckManagerReturn => {
                         const pending: PendingCardUpdate = {
                             id: updatedCard.id,
                             lastSeen: updatedCard.lastSeen,
-                            currentStudyInterval: updatedCard.currentStudyInterval
+                            currentStudyInterval: updatedCard.currentStudyInterval,
+                            updatedAt: updatedCard.updatedAt
                         };
                         const newBacklog = [...pendingUpdates.filter(p => p.id !== pending.id), pending];
                         updateBacklog(newBacklog);

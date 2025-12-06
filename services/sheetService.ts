@@ -12,6 +12,7 @@ export interface PendingCardUpdate {
   id: string;
   lastSeen: string | null;
   currentStudyInterval: string | null;
+  updatedAt?: string;
 }
 
 interface ColumnMapping {
@@ -26,6 +27,7 @@ interface ColumnMapping {
   Interval?: number;
   Status?: number;
   ID?: number;
+  Updated?: number;
 }
 
 const REQUIRED_HEADERS = ['Front', 'Back'];
@@ -157,6 +159,7 @@ export const loadCardsFromSheet = async (spreadsheetId: string): Promise<Card[]>
       lastSeen: getVal(mapping['Last Seen']) || null,
       currentStudyInterval: getVal(mapping.Interval) || null,
       status: status || 'Active',
+      updatedAt: getVal(mapping.Updated),
     };
   }).filter((c: Card) => !!c.front && c.status !== 'Inactive');
 };
@@ -206,6 +209,37 @@ export const updateCardInSheet = async (spreadsheetId: string, card: Card): Prom
     throw new RowNotFoundError(`Could not find row for card ID: ${card.id}.`);
   }
 
+  // Check for conflict
+  // We need to fetch the CURRENT row to compare timestamps.
+  // Note: findRowForCard already fetches the whole sheet (inefficient but safe for now),
+  // but it returns an index. We might need to refactor or just fetch the specific row again if we had the index.
+  // Since we don't have the row data from findRowForCard, let's just fetch the specific cell for 'Updated' if possible,
+  // or more simply, let's rely on the fact that we need to read before write for conflict resolution.
+
+  // Actually, to be safe and atomic-ish, we should check the timestamp.
+  // We can fetch just the 'Updated' column for that row.
+  let shouldUpdate = true;
+  if (mapping.Updated !== undefined) {
+    const updatedColLetter = getColumnLetter(mapping.Updated);
+    const timeResponse = await window.gapi.client.sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `Deck!${updatedColLetter}${rowNumber}`
+    });
+    const remoteUpdated = timeResponse.result.values?.[0]?.[0];
+
+    if (remoteUpdated && card.updatedAt) {
+      const remoteTime = new Date(remoteUpdated).getTime();
+      const localTime = new Date(card.updatedAt).getTime();
+      if (remoteTime >= localTime) {
+        console.warn(`Conflict detected for card ${card.id}. Remote (${remoteUpdated}) is newer or equal to local (${card.updatedAt}). Skipping update.`);
+        shouldUpdate = false;
+      }
+    }
+  }
+
+  if (!shouldUpdate) return; // Hook should handle this as "success" or explicit "skipped"? 
+  // User asked for "Last Write Wins" based on timestamp. If we skip, we are letting remote win.
+
   const updates: any[] = [];
 
   // Helper to push update if column exists
@@ -223,6 +257,7 @@ export const updateCardInSheet = async (spreadsheetId: string, card: Card): Prom
   addUpdate(mapping.Interval, card.currentStudyInterval);
   addUpdate(mapping.Status, card.status || 'Active');
   addUpdate(mapping.ID, card.id);
+  addUpdate(mapping.Updated, card.updatedAt);
 
   if (updates.length > 0) {
     await window.gapi.client.sheets.spreadsheets.values.batchUpdate({
@@ -263,21 +298,38 @@ export const batchUpdateCards = async (spreadsheetId: string, updates: PendingCa
     }
 
     if (rowIndex !== -1) {
-      const rowNumber = rowIndex + 2;
-
-      const addUpdate = (colIdx: number | undefined, value: any) => {
-        if (colIdx !== undefined) {
-          const colLetter = getColumnLetter(colIdx);
-          data.push({
-            range: `Deck!${colLetter}${rowNumber}`,
-            values: [[value]]
-          });
+      // Conflict Resolution for Batch
+      let shouldUpdate = true;
+      if (mapping.Updated !== undefined && update.updatedAt) {
+        const remoteUpdated = rows[rowIndex][mapping.Updated];
+        if (remoteUpdated) {
+          const remoteTime = new Date(remoteUpdated).getTime();
+          const localTime = new Date(update.updatedAt).getTime();
+          if (remoteTime >= localTime) {
+            console.warn(`Conflict: Remote ${remoteUpdated} >= Local ${update.updatedAt} for card ${update.id}`);
+            shouldUpdate = false;
+          }
         }
-      };
+      }
 
-      addUpdate(mapping['Last Seen'], update.lastSeen);
-      addUpdate(mapping.Interval, update.currentStudyInterval);
-      addUpdate(mapping.ID, update.id); // Ensure ID is persisted/re-affirmed
+      if (shouldUpdate) {
+        const rowNumber = rowIndex + 2;
+
+        const addUpdate = (colIdx: number | undefined, value: any) => {
+          if (colIdx !== undefined) {
+            const colLetter = getColumnLetter(colIdx);
+            data.push({
+              range: `Deck!${colLetter}${rowNumber}`,
+              values: [[value]]
+            });
+          }
+        };
+
+        addUpdate(mapping['Last Seen'], update.lastSeen);
+        addUpdate(mapping.Interval, update.currentStudyInterval);
+        addUpdate(mapping.ID, update.id); // Ensure ID is persisted/re-affirmed
+        addUpdate(mapping.Updated, update.updatedAt);
+      }
     }
   }
 

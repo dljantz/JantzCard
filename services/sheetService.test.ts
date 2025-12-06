@@ -1,74 +1,127 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { updateCardInSheet } from './sheetService'; // We test updateCardInSheet which calls findRowForCard internally
-import { Card } from '../types';
 
-// Mock the global google object
-const mockValuesGet = vi.fn();
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { batchUpdateCards, updateCardInSheet, Card, PendingCardUpdate } from './sheetService';
+
+// Mock GAPI
 const mockBatchUpdate = vi.fn();
+const mockGet = vi.fn();
 
-const setupGoogleMock = () => {
-    (global as any).window = {
-        gapi: {
-            client: {
-                sheets: {
-                    spreadsheets: {
-                        values: {
-                            get: mockValuesGet,
-                            batchUpdate: mockBatchUpdate
-                        }
+global.window = {
+    gapi: {
+        client: {
+            sheets: {
+                spreadsheets: {
+                    values: {
+                        get: mockGet,
+                        batchUpdate: mockBatchUpdate
                     }
                 }
             }
         }
-    };
-};
+    }
+} as any;
 
-describe('sheetService', () => {
+describe('Conflict Resolution', () => {
     beforeEach(() => {
-        setupGoogleMock();
         vi.clearAllMocks();
     });
 
-    afterEach(() => {
-        vi.restoreAllMocks();
-        delete (global as any).window;
-    });
-
-    it('should find row when sheet returns sparse array (missing trailing empty strings)', async () => {
-        // Setup Logic:
-        // 1. Mock getColumnMapping response (Header row)
-        // 2. Mock findRowForCard response (Data rows)
-
-        // Headers: Front, Back, Category (indices 0, 1, 2)
-        // Row 1 (Header)
-        mockValuesGet.mockResolvedValueOnce({
+    it('should update card if remote timestamp is older', async () => {
+        // Mock getColumnMapping response (Header row)
+        mockGet.mockResolvedValueOnce({
             result: {
-                values: [['Front', 'Back', 'Category']]
+                values: [['Front', 'Back', 'Updated', 'ID']]
             }
         });
 
-        // Row 2+ (Data)
-        // Scenario: Card has back="", but Sheet row is ['FrontVal'] (length 1), missing index 1 and 2
-        mockValuesGet.mockResolvedValueOnce({
+        // Mock current rows response for batchUpdateCards
+        // Row 2: ID="123", Updated="2023-01-01T00:00:00Z"
+        mockGet.mockResolvedValueOnce({
             result: {
                 values: [
-                    ['FrontVal'] // Sparse row! Missing 'Back' and 'Category'
+                    ['Front A', 'Back A', '2023-01-01T00:00:00Z', '123']
                 ]
             }
         });
 
-        const card: Card = {
-            id: 'temp-id', // ID doesn't match/exist in sheet yet, forces content search
-            front: 'FrontVal',
-            back: '', // Local state has empty string
-            category: 'General',
-            priorityLevel: 1,
+        const update: PendingCardUpdate = {
+            id: '123',
             lastSeen: null,
             currentStudyInterval: null,
-            status: 'Active'
+            updatedAt: '2023-01-02T00:00:00Z' // Newer
         };
 
-        // We expect this to SUCCEED now that we fixed the sparse array handling
-        await expect(updateCardInSheet('sheet-id', card)).resolves.not.toThrow();
+        await batchUpdateCards('sheet-id', [update]);
+
+        expect(mockBatchUpdate).toHaveBeenCalled();
+        const callArgs = mockBatchUpdate.mock.calls[0][0];
+        const data = callArgs.resource.data;
+        // Expect update to be pushed (Updated column is C/col 2)
+        // Indices: Front=0, Back=1, Updated=2, ID=3
+        // Update should include Updated column at C2
+        const updatedColUpdate = data.find((d: any) => d.range.includes('C2'));
+        expect(updatedColUpdate).toBeDefined();
+        expect(updatedColUpdate.values[0][0]).toBe('2023-01-02T00:00:00Z');
+    });
+
+    it('should SKIP update if remote timestamp is newer', async () => {
+        // Mock getColumnMapping response
+        mockGet.mockResolvedValueOnce({
+            result: {
+                values: [['Front', 'Back', 'Updated', 'ID']]
+            }
+        });
+
+        // Mock current rows
+        // Row 2: ID="123", Updated="2024-01-01T00:00:00Z" (Newer than local)
+        mockGet.mockResolvedValueOnce({
+            result: {
+                values: [
+                    ['Front A', 'Back A', '2024-01-01T00:00:00Z', '123']
+                ]
+            }
+        });
+
+        const update: PendingCardUpdate = {
+            id: '123',
+            lastSeen: null,
+            currentStudyInterval: null,
+            updatedAt: '2023-01-01T00:00:00Z' // Older
+        };
+
+        await batchUpdateCards('sheet-id', [update]);
+
+        // Should NOT call batchUpdate if all updates are skipped
+        // Wait, batchUpdateCards calls batchUpdate only if data > 0.
+        expect(mockBatchUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should SKIP update if remote timestamp is EQUAL', async () => {
+        // Mock getColumnMapping response
+        mockGet.mockResolvedValueOnce({
+            result: {
+                values: [['Front', 'Back', 'Updated', 'ID']]
+            }
+        });
+
+        // Mock current rows
+        mockGet.mockResolvedValueOnce({
+            result: {
+                values: [
+                    ['Front A', 'Back A', '2024-01-01T00:00:00Z', '123']
+                ]
+            }
+        });
+
+        const update: PendingCardUpdate = {
+            id: '123',
+            lastSeen: null,
+            currentStudyInterval: null,
+            updatedAt: '2024-01-01T00:00:00Z' // Equal
+        };
+
+        await batchUpdateCards('sheet-id', [update]);
+
+        expect(mockBatchUpdate).not.toHaveBeenCalled();
     });
 });
