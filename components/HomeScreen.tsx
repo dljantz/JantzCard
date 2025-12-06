@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleUser } from '../types';
 import { DeckHistoryItem } from '../services/driveService';
+import RecentDeckItem from './RecentDeckItem';
 
 interface HomeScreenProps {
   onStartSheet: (url: string) => void;
@@ -117,14 +118,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   <h3 className="text-lg font-semibold text-gray-200 border-b border-gray-700 pb-2">Recent Decks</h3>
                   <div className="space-y-2">
                     {recentDecks.map((deck) => (
-                      <button
+                      <RecentDeckItem
                         key={deck.spreadsheetId}
-                        onClick={() => onStartSheet(`https://docs.google.com/spreadsheets/d/${deck.spreadsheetId}`)}
-                        className="w-full text-left p-3 hover:bg-gray-800 rounded border border-gray-700 hover:border-blue-500 transition-all group"
-                      >
-                        <div className="font-medium text-blue-400 group-hover:text-blue-300">{deck.name || 'Untitled Deck'}</div>
-                        <div className="text-xs text-gray-500">Last visited: {new Date(deck.lastVisited).toLocaleDateString()}</div>
-                      </button>
+                        deck={deck}
+                        onStart={onStartSheet}
+                      />
                     ))}
                   </div>
                 </div>
