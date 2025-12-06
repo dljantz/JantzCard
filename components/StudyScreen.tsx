@@ -112,10 +112,9 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
         if (interval === preselectedInterval) {
           handleConfirmInterval(interval);
         } else {
-          // If clicking a different interval while one is selected, 
-          // deselect the original and flip back to front
-          setPreselectedInterval(null);
-          setIsFlipped(false);
+          // If clicking a different interval while one is selected,
+          // just switch the selection
+          setPreselectedInterval(interval);
         }
       } else {
         setPreselectedInterval(interval);

@@ -10,6 +10,11 @@ interface IntervalButtonProps {
   size?: 'default' | 'small';
   disabled?: boolean;
   isBold?: boolean;
+  onMouseDown?: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onMouseUp?: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onMouseLeave?: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onTouchStart?: (event: React.TouchEvent<HTMLButtonElement>) => void;
+  onTouchEnd?: (event: React.TouchEvent<HTMLButtonElement>) => void;
 }
 
 const IntervalButton: React.FC<IntervalButtonProps> = ({
@@ -20,7 +25,12 @@ const IntervalButton: React.FC<IntervalButtonProps> = ({
   title,
   size = 'default',
   disabled = false,
-  isBold = false
+  isBold = false,
+  onMouseDown,
+  onMouseUp,
+  onMouseLeave,
+  onTouchStart,
+  onTouchEnd
 }) => {
 
   const sizeClasses = {
@@ -66,6 +76,11 @@ const IntervalButton: React.FC<IntervalButtonProps> = ({
       aria-pressed={isSelected}
       disabled={!interval || disabled}
       title={title}
+      onMouseDown={onMouseDown}
+      onMouseUp={onMouseUp}
+      onMouseLeave={onMouseLeave}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
     >
       {interval}
     </button>
