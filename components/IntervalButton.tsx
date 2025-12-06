@@ -5,24 +5,24 @@ interface IntervalButtonProps {
   interval: string | null; // Allow null for placeholders
   backgroundColor: string;
   isSelected: boolean;
-  onClick: () => void;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
   title?: string;
   size?: 'default' | 'small';
   disabled?: boolean;
   isBold?: boolean;
 }
 
-const IntervalButton: React.FC<IntervalButtonProps> = ({ 
-  interval, 
-  backgroundColor, 
-  isSelected, 
-  onClick, 
-  title, 
-  size = 'default', 
+const IntervalButton: React.FC<IntervalButtonProps> = ({
+  interval,
+  backgroundColor,
+  isSelected,
+  onClick,
+  title,
+  size = 'default',
   disabled = false,
-  isBold = false 
+  isBold = false
 }) => {
-  
+
   const sizeClasses = {
     default: "h-16 md:h-20 text-2xl",
     small: "h-12 md:h-16 text-lg"
@@ -40,12 +40,12 @@ const IntervalButton: React.FC<IntervalButtonProps> = ({
 
   const fontWeight = isBold ? "font-black" : "font-bold";
   const baseClasses = `w-full flex items-center justify-center rounded-md text-white ${fontWeight} transition-all duration-150 ease-in-out focus:outline-none transform`;
-  
+
   // State-dependent classes for scaling and rings.
   const stateClasses = isSelected
     ? 'ring-2 ring-white/70 shadow-lg scale-110'
     : 'hover:scale-105';
-  
+
   const disabledClasses = disabled ? 'cursor-not-allowed' : '';
 
   const colorClass = `bg-[${backgroundColor}]`;

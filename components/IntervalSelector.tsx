@@ -16,13 +16,13 @@ interface IntervalSelectorProps {
 const intervalLabels = STUDY_INTERVALS.map(i => i.label);
 const SHORT_SCREEN_HEIGHT_THRESHOLD = 500; // Switch to single-row layout below this height in pixels
 
-const IntervalSelector: React.FC<IntervalSelectorProps> = ({ 
-  centerIntervalLabel, 
+const IntervalSelector: React.FC<IntervalSelectorProps> = ({
+  centerIntervalLabel,
   lastIntendedInterval,
-  onSelect, 
-  preselection, 
-  isFlipped, 
-  isDisabled = false 
+  onSelect,
+  preselection,
+  isFlipped,
+  isDisabled = false
 }) => {
   const { height } = useViewport();
   const isShortScreen = height < SHORT_SCREEN_HEIGHT_THRESHOLD;
@@ -40,7 +40,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
       const index = centerIdx + 1 + i;
       return index < intervalLabels.length ? intervalLabels[index] : null;
     });
-    
+
     const center = intervalLabels[centerIdx];
 
     return { redIntervals: reds, centerInterval: center, greenIntervals: greens };
@@ -79,7 +79,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   const renderSingleRowLayout = () => {
     const allIntervals = [...redIntervals, centerInterval, ...greenIntervals];
     const allColors = [...RED_INTERVAL_COLORS, YELLOW_INTERVAL_COLOR, ...GREEN_INTERVAL_COLORS];
-    
+
     return (
       <div className={`w-full grid grid-cols-11 gap-1 md:gap-2 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
         {allIntervals.map((interval, index) => {
@@ -91,7 +91,10 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
               interval={interval}
               backgroundColor={allColors[index]}
               isSelected={preselection === interval}
-              onClick={() => interval && onSelect(interval)}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (interval) onSelect(interval);
+              }}
               size="small"
               title={getButtonTooltip(interval, isCenter)}
               disabled={isDisabled}
@@ -114,7 +117,10 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
               interval={interval}
               backgroundColor={RED_INTERVAL_COLORS[index]}
               isSelected={preselection === interval}
-              onClick={() => interval && onSelect(interval)}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (interval) onSelect(interval);
+              }}
               size="default"
               title={getButtonTooltip(interval, false)}
               disabled={isDisabled}
@@ -129,7 +135,10 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
             interval={centerInterval}
             backgroundColor={YELLOW_INTERVAL_COLOR}
             isSelected={preselection === centerInterval}
-            onClick={() => centerInterval && onSelect(centerInterval)}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (centerInterval) onSelect(centerInterval);
+            }}
             title={getButtonTooltip(centerInterval, true)}
             size="default"
             disabled={isDisabled}
@@ -145,7 +154,10 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
               interval={interval}
               backgroundColor={GREEN_INTERVAL_COLORS[index]}
               isSelected={preselection === interval}
-              onClick={() => interval && onSelect(interval)}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (interval) onSelect(interval);
+              }}
               size="default"
               title={getButtonTooltip(interval, false)}
               disabled={isDisabled}

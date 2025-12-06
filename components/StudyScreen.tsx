@@ -112,7 +112,10 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
         if (interval === preselectedInterval) {
           handleConfirmInterval(interval);
         } else {
+          // If clicking a different interval while one is selected, 
+          // deselect the original and flip back to front
           setPreselectedInterval(null);
+          setIsFlipped(false);
         }
       } else {
         setPreselectedInterval(interval);
@@ -127,6 +130,16 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
     const elapsedMs = Date.now() - new Date(currentCard.lastSeen).getTime();
     return findClosestInterval(elapsedMs);
   }, [currentCard]);
+
+  const handleBackgroundClick = () => {
+    // If a selection is active (or card is flipped), 
+    // clicking the background should deselect and flip back to front.
+    // Note: IntervalButton clicks stop propagation, so they won't trigger this.
+    if (isFlipped) {
+      setPreselectedInterval(null);
+      setIsFlipped(false);
+    }
+  };
 
   // Construct the display card.
   // If we are in a transition, we overlay the previous card's back content onto the new card
@@ -153,7 +166,10 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
   const isSavedLocallyWarning = saveError && saveError.includes && saveError.includes('saved to this device');
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div
+      className="flex flex-col h-screen overflow-hidden"
+      onClick={handleBackgroundClick}
+    >
       <header className="p-4 bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 relative">
         <div className="absolute top-4 left-4 z-20 flex gap-2">
           <button
