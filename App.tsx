@@ -19,6 +19,7 @@ const App: React.FC = () => {
     queue,
     currentCard,
     isLoading: isDeckLoading,
+    isSaving: isDeckSaving,
     syncMessage,
     error: deckError,
     pendingUpdatesCount,
@@ -115,7 +116,7 @@ const App: React.FC = () => {
             onFinish={handleFinishStudy}
             onExit={handleRestart}
             onReload={reloadDeck}
-            isSaving={isDeckLoading}
+            isSaving={isDeckSaving}
             dataSource={dataSource}
             saveError={getSaveStatusMessage()}
           />

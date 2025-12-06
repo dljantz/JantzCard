@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Card, DataSource } from '../types';
 import { calculateStudyQueue } from './useStudyQueue';
 import { getMockData, updateCard as updateMockCard } from '../services/dataService';
@@ -21,6 +21,7 @@ export interface UseDeckManagerReturn {
     queue: string[];
     currentCard: Card | null;
     isLoading: boolean;
+    isSaving: boolean;
     syncMessage: string | null;
     error: string | null;
     pendingUpdatesCount: number;
@@ -37,9 +38,14 @@ export const useDeckManager = (): UseDeckManagerReturn => {
     const [cards, setCards] = useState<Card[]>([]);
     const [queue, setQueue] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [syncMessage, setSyncMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pendingUpdates, setPendingUpdates] = useState<PendingCardUpdate[]>([]);
+
+    // Queue for processing sequential saves
+    const saveQueueRef = useRef<Card[]>([]);
+    const isProcessingQueueRef = useRef(false);
 
     // Internal Reference to Sheet ID (persisted in hook state for reload)
     const [currentSpreadsheetId, setCurrentSpreadsheetId] = useState<string | null>(null);
@@ -191,55 +197,88 @@ export const useDeckManager = (): UseDeckManagerReturn => {
         }
     }, [dataSource, currentSpreadsheetId, pendingUpdates, processBacklog]);
 
-    const updateCard = useCallback(async (updatedCard: Card) => {
-        setIsLoading(true);
-        // Inject timestamp for conflict resolution
-        updatedCard.updatedAt = new Date().toISOString();
+    // Unified process for handling the save queue
+    const processSaveQueue = useCallback(async () => {
+        if (isProcessingQueueRef.current || saveQueueRef.current.length === 0) return;
 
-        // Optimistic Update
-        const newCards = cards.map(c => c.id === updatedCard.id ? updatedCard : c);
-        setCards(newCards);
-        setQueue(calculateStudyQueue(newCards));
+        isProcessingQueueRef.current = true;
+        setIsSaving(true);
+        setSyncMessage("Saving..."); // Keep user informed
 
         try {
-            if (dataSource === DataSource.Sheet) {
-                if (!currentSpreadsheetId) throw new Error("Spreadsheet ID lost");
+            while (saveQueueRef.current.length > 0) {
+                const nextCard = saveQueueRef.current[0]; // Peek
+
+                // If not sheet, just mock update and shift
+                if (dataSource !== DataSource.Sheet) {
+                    await updateMockCard(nextCard);
+                    saveQueueRef.current.shift();
+                    continue;
+                }
+
+                if (!currentSpreadsheetId) {
+                    throw new Error("Spreadsheet ID lost");
+                }
 
                 try {
-                    await updateCardInSheet(currentSpreadsheetId, updatedCard);
-                    setSyncMessage(null);
+                    await updateCardInSheet(currentSpreadsheetId, nextCard);
 
-                    // If successful, try to clear any remaining backlog
+                    // Success! Remove from queue
+                    saveQueueRef.current.shift();
+
+                    // If successful, try to clear any remaining backlog from offline usage
                     if (pendingUpdates.length > 0) {
                         await processBacklog(currentSpreadsheetId, pendingUpdates);
                     }
                 } catch (sheetError: any) {
+                    // Failed for this specific card
+                    saveQueueRef.current.shift(); // Remove from active queue to unblock next items
+
                     if (sheetError instanceof RowNotFoundError) {
                         console.warn("Card deleted remotely. Removing from backlog.");
-                        const newBacklog = pendingUpdates.filter(p => p.id !== updatedCard.id);
+                        // It might have been added to pendingUpdates in a previous life? 
+                        // But here we are just failing the live save.
+                        // Ensure it's not in backlog either
+                        const newBacklog = pendingUpdates.filter(p => p.id !== nextCard.id);
                         updateBacklog(newBacklog);
                         setSyncMessage("Sync skipped: Card deleted remotely.");
                     } else {
                         console.warn("Update failed, queueing offline.", sheetError);
                         const pending: PendingCardUpdate = {
-                            id: updatedCard.id,
-                            lastSeen: updatedCard.lastSeen,
-                            currentStudyInterval: updatedCard.currentStudyInterval,
-                            updatedAt: updatedCard.updatedAt
+                            id: nextCard.id,
+                            lastSeen: nextCard.lastSeen,
+                            currentStudyInterval: nextCard.currentStudyInterval,
+                            updatedAt: nextCard.updatedAt
                         };
+                        // Add to persistent backlog
                         const newBacklog = [...pendingUpdates.filter(p => p.id !== pending.id), pending];
                         updateBacklog(newBacklog);
                     }
                 }
-            } else {
-                await updateMockCard(updatedCard);
             }
+            setSyncMessage(null);
         } catch (e: any) {
-            setSyncMessage("System Error: " + e.message);
+            setSyncMessage("System Error during save: " + e.message);
         } finally {
-            setIsLoading(false);
+            isProcessingQueueRef.current = false;
+            setIsSaving(false);
         }
-    }, [cards, dataSource, currentSpreadsheetId, pendingUpdates, processBacklog]);
+    }, [dataSource, currentSpreadsheetId, pendingUpdates, processBacklog]);
+
+    const updateCard = useCallback(async (updatedCard: Card) => {
+        // Inject timestamp for conflict resolution
+        updatedCard.updatedAt = new Date().toISOString();
+
+        // Optimistic Update (Immediate UI reflection)
+        const newCards = cards.map(c => c.id === updatedCard.id ? updatedCard : c);
+        setCards(newCards);
+        setQueue(calculateStudyQueue(newCards));
+
+        // Add to queue and trigger processing
+        saveQueueRef.current.push(updatedCard);
+        processSaveQueue();
+
+    }, [cards, dataSource, currentSpreadsheetId, processSaveQueue]);
 
     const currentCard = queue.length > 0 ? cards.find(c => c.id === queue[0]) || null : null;
 
@@ -248,6 +287,7 @@ export const useDeckManager = (): UseDeckManagerReturn => {
         queue,
         currentCard,
         isLoading,
+        isSaving,
         syncMessage,
         error,
         pendingUpdatesCount: pendingUpdates.length,

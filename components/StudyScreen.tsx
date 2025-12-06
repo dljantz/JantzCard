@@ -90,7 +90,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
   }, [queue.length, currentCard, onFinish]);
 
   const handleConfirmInterval = useCallback((interval: string) => {
-    if (!currentCard || isSaving) return;
+    if (!currentCard) return;
 
     const updatedCard: Card = {
       ...currentCard,
@@ -99,10 +99,10 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
     };
     onCardUpdate(updatedCard);
 
-  }, [currentCard, onCardUpdate, isSaving]);
+  }, [currentCard, onCardUpdate]); // Removed isSaving dependency since we don't use it here now
 
   const handleIntervalSelect = (interval: string) => {
-    if (isSaving) return; // Prevent selection while saving
+    // We no longer block on isSaving, allowing queueing
 
     if (!isFlipped) {
       setPreselectedInterval(interval);
@@ -260,7 +260,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
           onSelect={handleIntervalSelect}
           preselection={preselectedInterval}
           isFlipped={isFlipped}
-          isDisabled={isSaving}
+          isDisabled={false}
         />
       </footer>
     </div>
