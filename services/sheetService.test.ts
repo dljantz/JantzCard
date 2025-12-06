@@ -1,6 +1,6 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { batchUpdateCards, updateCardInSheet, Card, PendingCardUpdate } from './sheetService';
+import { batchUpdateCards, PendingCardUpdate } from './sheetService';
 
 // Mock GAPI
 const mockBatchUpdate = vi.fn();
