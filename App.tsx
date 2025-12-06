@@ -6,6 +6,8 @@ import { useDeckManager } from './hooks/useDeckManager';
 import HomeScreen from './components/HomeScreen';
 import StudyScreen from './components/StudyScreen';
 import CompletionScreen from './components/CompletionScreen';
+import AboutScreen from './components/AboutScreen';
+import SettingsScreen from './components/SettingsScreen';
 import { getHistory, DeckHistoryItem } from './services/driveService';
 
 const App: React.FC = () => {
@@ -97,6 +99,8 @@ const App: React.FC = () => {
           isAuthReady={isReady}
           isLoadingCards={isDeckLoading}
           recentDecks={recentDecks}
+          onNavigateToAbout={() => setAppState(AppState.About)}
+          onNavigateToSettings={() => setAppState(AppState.Settings)}
         />
       );
     }
@@ -123,6 +127,10 @@ const App: React.FC = () => {
             onRestart={handleRestart}
           />
         );
+      case AppState.About:
+        return <AboutScreen onBack={() => setAppState(AppState.Home)} />;
+      case AppState.Settings:
+        return <SettingsScreen onBack={() => setAppState(AppState.Home)} />;
       case AppState.Home:
       default:
         return (
@@ -136,6 +144,8 @@ const App: React.FC = () => {
             isAuthReady={isReady}
             isLoadingCards={isDeckLoading && dataSource === DataSource.Sheet}
             recentDecks={recentDecks}
+            onNavigateToAbout={() => setAppState(AppState.About)}
+            onNavigateToSettings={() => setAppState(AppState.Settings)}
           />
         );
     }

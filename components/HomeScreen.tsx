@@ -12,6 +12,8 @@ interface HomeScreenProps {
   isAuthReady: boolean;
   isLoadingCards: boolean;
   recentDecks: DeckHistoryItem[];
+  onNavigateToAbout: () => void;
+  onNavigateToSettings: () => void;
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -23,7 +25,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   isAuthLoading,
   isAuthReady,
   isLoadingCards,
-  recentDecks
+  recentDecks,
+  onNavigateToAbout,
+  onNavigateToSettings
 }) => {
   // Sheet Verification State
   const [sheetUrl, setSheetUrl] = useState('');
@@ -192,6 +196,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </div>
       </div>
+
+      {/* Footer Navigation */}
+      <footer className="mt-12 text-gray-500 text-sm flex gap-6">
+        <button onClick={onNavigateToAbout} className="hover:text-blue-400 transition-colors">About</button>
+        <button onClick={onNavigateToSettings} className="hover:text-blue-400 transition-colors">Settings</button>
+      </footer>
     </main>
   );
 };

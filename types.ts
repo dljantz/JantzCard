@@ -14,6 +14,8 @@ export enum AppState {
   Home,
   Studying,
   Finished,
+  About,
+  Settings,
 }
 
 export enum DataSource {
