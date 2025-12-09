@@ -15,6 +15,7 @@ import {
 import { addToHistory } from '../services/driveService';
 
 const BACKLOG_STORAGE_KEY = 'jantzcard_pending_sheet_updates';
+const ACTIVE_QUEUE_STORAGE_KEY = 'jantzcard_active_save_queue';
 
 export interface UseDeckManagerReturn {
     cards: Card[];
@@ -50,15 +51,57 @@ export const useDeckManager = (): UseDeckManagerReturn => {
     // Internal Reference to Sheet ID (persisted in hook state for reload)
     const [currentSpreadsheetId, setCurrentSpreadsheetId] = useState<string | null>(null);
 
-    // Load backlog on mount
+    // Load backlog and recover stranded active items on mount
     useEffect(() => {
+        let initialBacklog: PendingCardUpdate[] = [];
+
+        // 1. Load normal backlog
         const savedBacklog = localStorage.getItem(BACKLOG_STORAGE_KEY);
         if (savedBacklog) {
             try {
-                setPendingUpdates(JSON.parse(savedBacklog));
+                initialBacklog = JSON.parse(savedBacklog);
             } catch (e) {
                 console.error("Failed to parse saved backlog", e);
             }
+        }
+
+        // 2. Check for stranded active items (app closed while saving)
+        const strandedQueue = localStorage.getItem(ACTIVE_QUEUE_STORAGE_KEY);
+        if (strandedQueue) {
+            try {
+                const strandedItems: Card[] = JSON.parse(strandedQueue);
+                if (strandedItems.length > 0) {
+                    console.warn(`Recovered ${strandedItems.length} items from interrupted session.`);
+                    // Convert Card[] to PendingCardUpdate[]
+                    const recoveredUpdates: PendingCardUpdate[] = strandedItems.map(c => ({
+                        id: c.id,
+                        lastSeen: c.lastSeen,
+                        currentStudyInterval: c.currentStudyInterval,
+                        updatedAt: c.updatedAt
+                    }));
+
+                    // Merge, favoring recovered items if duplicates exist (they are newer)
+                    // Actually, let's just append and let the backlog processor handle duplicates/ordering if possible?
+                    // Better to filter out duplicates in initialBacklog that match recovered IDs
+                    initialBacklog = [
+                        ...initialBacklog.filter(b => !recoveredUpdates.some(r => r.id === b.id)),
+                        ...recoveredUpdates
+                    ];
+
+                    // Clear the active queue now that we've "rescued" them to backlog
+                    localStorage.removeItem(ACTIVE_QUEUE_STORAGE_KEY);
+                }
+            } catch (e) {
+                console.error("Failed to recover stranded queue", e);
+            }
+        }
+
+        if (initialBacklog.length > 0) {
+            setPendingUpdates(initialBacklog);
+            // We don't necessarily need to write to localStorage here because setPendingUpdates usually
+            // doesn't auto-persist. But our `updateBacklog` helper does. 
+            // Ideally we should persist the merged result immediately.
+            localStorage.setItem(BACKLOG_STORAGE_KEY, JSON.stringify(initialBacklog));
         }
     }, []);
 
@@ -225,6 +268,7 @@ export const useDeckManager = (): UseDeckManagerReturn => {
 
                     // Success! Remove from queue
                     saveQueueRef.current.shift();
+                    localStorage.setItem(ACTIVE_QUEUE_STORAGE_KEY, JSON.stringify(saveQueueRef.current));
 
                     // If successful, try to clear any remaining backlog from offline usage
                     if (pendingUpdates.length > 0) {
@@ -233,6 +277,7 @@ export const useDeckManager = (): UseDeckManagerReturn => {
                 } catch (sheetError: any) {
                     // Failed for this specific card
                     saveQueueRef.current.shift(); // Remove from active queue to unblock next items
+                    localStorage.setItem(ACTIVE_QUEUE_STORAGE_KEY, JSON.stringify(saveQueueRef.current)); // Update persistence
 
                     if (sheetError instanceof RowNotFoundError) {
                         console.warn("Card deleted remotely. Removing from backlog.");
@@ -262,6 +307,10 @@ export const useDeckManager = (): UseDeckManagerReturn => {
         } finally {
             isProcessingQueueRef.current = false;
             setIsSaving(false);
+            // Final cleanup check (queue should be empty here if loop finished naturally)
+            if (saveQueueRef.current.length === 0) {
+                localStorage.removeItem(ACTIVE_QUEUE_STORAGE_KEY);
+            }
         }
     }, [dataSource, currentSpreadsheetId, pendingUpdates, processBacklog]);
 
@@ -276,6 +325,8 @@ export const useDeckManager = (): UseDeckManagerReturn => {
 
         // Add to queue and trigger processing
         saveQueueRef.current.push(updatedCard);
+        localStorage.setItem(ACTIVE_QUEUE_STORAGE_KEY, JSON.stringify(saveQueueRef.current));
+
         processSaveQueue();
 
     }, [cards, dataSource, currentSpreadsheetId, processSaveQueue]);
