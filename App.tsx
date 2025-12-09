@@ -37,7 +37,8 @@ const App: React.FC = () => {
     logout,
     currentUser,
     error: authError,
-    isLoading: isAuthLoading
+    isLoading: isAuthLoading,
+    checkSession
   } = useGoogleAuth();
 
   // Load History
@@ -48,6 +49,28 @@ const App: React.FC = () => {
       setRecentDecks([]);
     }
   }, [currentUser]);
+
+  // Reactive Session Check (On Error)
+  useEffect(() => {
+    const hasDeckError = !!deckError;
+    const hasSyncError = syncMessage && (
+      syncMessage.toLowerCase().includes('error') ||
+      syncMessage.toLowerCase().includes('failed')
+    );
+
+    if ((hasDeckError || hasSyncError) && currentUser) {
+      // If we have an error that COULD be auth related, check session.
+      // We rely on the hook to logout (and thus trigger UI update) if invalid.
+      checkSession();
+    }
+  }, [deckError, syncMessage, currentUser, checkSession]);
+
+  // Redirect to Home if user logs out (or session expires)
+  useEffect(() => {
+    if (!currentUser && appState !== AppState.Home) {
+      setAppState(AppState.Home);
+    }
+  }, [currentUser, appState]);
 
   // Handlers
   const handleStartSheetStudy = async (sheetUrl: string) => {

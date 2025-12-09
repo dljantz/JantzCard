@@ -219,6 +219,43 @@ export const useGoogleAuth = () => {
     }
   }, []);
 
+  const checkSession = useCallback(() => {
+    // If not logged in, nothing to check, technically "valid" in that we aren't in an invalid state, but here we want to know if session is active.
+    // However, if we are calling this to "check if logged in", returning false is correct.
+    if (!currentUser) return false;
+
+    const storedExpiry = localStorage.getItem(EXPIRY_STORAGE_KEY);
+    if (!storedExpiry) return false;
+
+    // Check expiry
+    if (Date.now() >= parseInt(storedExpiry, 10)) {
+      console.warn("Session expired proactively.");
+
+      // Force logout cleanup but maybe keep email convenience? 
+      // The user requested: "Prompt them to sign in again".
+      // Calling logout() clears everything and currentUser, which triggers App.tsx to show HomeScreen with login prompt.
+
+      // We'll call the internal logout logic but maybe skip the network revoke if token is already dead?
+      // Token expiry is client-side heuristic here. Google might still accept it if clock skew, but let's be safe.
+      // Actually, safely calling logout() is fine.
+      logout();
+      setError("Session expired. Please sign in again.");
+      return false;
+    }
+    return true;
+  }, [currentUser, logout]);
+
+  // Proactive Period Check
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const interval = setInterval(() => {
+      checkSession();
+    }, 60000); // 1 minute
+
+    return () => clearInterval(interval);
+  }, [currentUser, checkSession]);
+
   return {
     isReady: isGapiLoaded && isGisLoaded,
     initializeClient,
@@ -226,6 +263,7 @@ export const useGoogleAuth = () => {
     logout,
     currentUser,
     error,
-    isLoading
+    isLoading,
+    checkSession
   };
 };
