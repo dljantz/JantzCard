@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GoogleUser } from '../types';
 import { DeckHistoryItem } from '../services/driveService';
 import RecentDeckItem from './RecentDeckItem';
+import { loadCardsFromSheet } from '../services/sheetService';
+import { calculateStudyQueue } from '../hooks/useStudyQueue';
 
 interface HomeScreenProps {
   onStartSheet: (url: string) => void;
@@ -35,7 +37,83 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   // Sheet Verification State
   const [sheetUrl, setSheetUrl] = useState('');
 
+  // Deck Statistics State
+  const [deckStats, setDeckStats] = useState<Record<string, { overdue: number | null, loading: boolean, error: boolean }>>({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+
   const hasAttemptedAutoLogin = useRef(false);
+
+  // Refresh Deck Statistics
+  const refreshDecks = async (decksToLoad: DeckHistoryItem[]) => {
+    if (!decksToLoad.length) return;
+
+    setIsRefreshing(true);
+    const newStats: Record<string, { overdue: number | null, loading: boolean, error: boolean }> = {};
+
+    // Initialize loading state for all
+    decksToLoad.forEach(deck => {
+      newStats[deck.spreadsheetId] = {
+        overdue: deckStats[deck.spreadsheetId]?.overdue ?? null, // Keep old value while loading
+        loading: true,
+        error: false
+      };
+    });
+    setDeckStats(prev => ({ ...prev, ...newStats }));
+
+    // Fetch in parallel
+    await Promise.all(decksToLoad.map(async (deck) => {
+      try {
+        const cards = await loadCardsFromSheet(deck.spreadsheetId);
+        const queue = calculateStudyQueue(cards);
+
+        setDeckStats(prev => ({
+          ...prev,
+          [deck.spreadsheetId]: { overdue: queue.length, loading: false, error: false }
+        }));
+      } catch (err) {
+        console.error(`Failed to refresh deck ${deck.name}`, err);
+        setDeckStats(prev => ({
+          ...prev,
+          [deck.spreadsheetId]: {
+            overdue: prev[deck.spreadsheetId]?.overdue ?? null,
+            loading: false,
+            error: true
+          }
+        }));
+      }
+    }));
+
+    setLastUpdated(Date.now());
+    setIsRefreshing(false);
+  };
+
+  // Initial Load of Stats
+  useEffect(() => {
+    if (recentDecks.length > 0 && !lastUpdated) {
+      refreshDecks(recentDecks);
+    }
+  }, [recentDecks, lastUpdated]);
+
+  // Format "Last updated" text
+  const getLastUpdatedText = () => {
+    if (!lastUpdated) return "";
+    const seconds = Math.floor((Date.now() - lastUpdated) / 1000);
+    if (seconds < 60) return "Just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    return `${Math.floor(minutes / 60)}h ago`;
+  };
+
+  // Auto-refresh timestamp text every minute
+  const [timeText, setTimeText] = useState("");
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeText(getLastUpdatedText());
+    }, 60000);
+    setTimeText(getLastUpdatedText()); // Initial set
+    return () => clearInterval(timer);
+  }, [lastUpdated]);
 
   // Attempt auto-login if auth is ready
   useEffect(() => {
@@ -125,13 +203,31 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               {/* Recent Decks */}
               {recentDecks.length > 0 && (
                 <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-600 text-left space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-200 border-b border-gray-700 pb-2">Recent Decks</h3>
+                  <div className="flex justify-between items-center border-b border-gray-700 pb-2 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-200">Recent Decks</h3>
+                    <div className="flex items-center gap-3">
+                      {lastUpdated && <span className="text-xs text-gray-500">{timeText}</span>}
+                      <button
+                        onClick={() => refreshDecks(recentDecks)}
+                        disabled={isRefreshing}
+                        className={`p-1.5 rounded-full hover:bg-gray-700 text-gray-400 hover:text-white transition-all ${isRefreshing ? 'animate-spin text-blue-400' : ''}`}
+                        title="Reload deck info"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                   <div className="space-y-2">
                     {recentDecks.map((deck) => (
                       <RecentDeckItem
                         key={deck.spreadsheetId}
                         deck={deck}
                         onStart={onStartSheet}
+                        overdueCount={deckStats[deck.spreadsheetId]?.overdue ?? null}
+                        loading={deckStats[deck.spreadsheetId]?.loading ?? false}
+                        error={deckStats[deck.spreadsheetId]?.error ?? false}
                       />
                     ))}
                   </div>

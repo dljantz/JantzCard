@@ -1,37 +1,16 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { DeckHistoryItem } from '../services/driveService';
-import { loadCardsFromSheet } from '../services/sheetService';
-import { calculateStudyQueue } from '../hooks/useStudyQueue';
 
 interface RecentDeckItemProps {
     deck: DeckHistoryItem;
     onStart: (url: string) => void;
+    overdueCount: number | null;
+    loading: boolean;
+    error: boolean;
 }
 
-const RecentDeckItem: React.FC<RecentDeckItemProps> = ({ deck, onStart }) => {
-    const [overdueCount, setOverdueCount] = useState<number | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
-
-    useEffect(() => {
-        const fetchOverdueCount = async () => {
-            try {
-                setLoading(true);
-                const cards = await loadCardsFromSheet(deck.spreadsheetId);
-                const queue = calculateStudyQueue(cards);
-                setOverdueCount(queue.length);
-            } catch (err) {
-                console.error(`Failed to load overdue count for deck ${deck.name}`, err);
-                setError(true);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchOverdueCount();
-    }, [deck.spreadsheetId, deck.name]);
-
+const RecentDeckItem: React.FC<RecentDeckItemProps> = ({ deck, onStart, overdueCount, loading, error }) => {
     return (
         <button
             onClick={() => onStart(`https://docs.google.com/spreadsheets/d/${deck.spreadsheetId}`)}
