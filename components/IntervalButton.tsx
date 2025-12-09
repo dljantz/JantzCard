@@ -49,7 +49,7 @@ const IntervalButton: React.FC<IntervalButtonProps> = ({
   }
 
   const fontWeight = isBold ? "font-black" : "font-bold";
-  const baseClasses = `w-full flex items-center justify-center rounded-md text-white ${fontWeight} transition-all duration-150 ease-in-out focus:outline-none transform`;
+  const baseClasses = `w-full flex items-center justify-center rounded-md text-white ${fontWeight} transition-all duration-150 ease-in-out focus:outline-none transform select-none touch-manipulation`;
 
   // State-dependent classes for scaling and rings.
   const stateClasses = isSelected
