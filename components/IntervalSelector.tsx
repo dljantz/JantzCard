@@ -99,7 +99,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
           setMinOverride(intervalLabels[currentIndex]);
         }
       }
-    }, 1000);
+    }, 500);
   };
 
   const stopCycling = (intervalToSelect?: string | null) => {
