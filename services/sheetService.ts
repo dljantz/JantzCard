@@ -114,6 +114,7 @@ const getColumnMapping = async (spreadsheetId: string): Promise<ColumnMapping> =
 
 /**
  * Loads cards from the user's spreadsheet using dynamic column mapping.
+ * Enforces unique IDs: if missing or duplicate, generates new IDs and saves to Sheet.
  */
 export const loadCardsFromSheet = async (spreadsheetId: string): Promise<Card[]> => {
   if (!window.gapi?.client?.sheets) {
@@ -134,26 +135,57 @@ export const loadCardsFromSheet = async (spreadsheetId: string): Promise<Card[]>
     return [];
   }
 
-  return rows.map((row: any[]) => {
+  const seenIds = new Set<string>();
+  const updates: { range: string; values: any[][] }[] = [];
+  const cards: Card[] = [];
+
+  rows.forEach((row: any[], index: number) => {
     // Helper to safely get value at index
     const getVal = (colIdx?: number) => colIdx !== undefined ? row[colIdx] : undefined;
 
     let id = getVal(mapping.ID);
-    const status = getVal(mapping.Status);
+    let needsUpdate = false;
 
-    // If ID is missing, generate one in memory (will be saved later)
+    // 0. Skip Empty Rows (No Front)
+    const front = getVal(mapping.Front);
+    if (!front || String(front).trim() === '') {
+      return; // Skip this row entirely
+    }
+
+    // 1. Check for Missing ID
     if (!id) {
       id = generateUniqueId();
+      needsUpdate = true;
     }
 
     // Enforce string ID to avoid type mismatches
     id = String(id);
 
+    // 2. Check for Duplicate ID
+    if (seenIds.has(id)) {
+      id = generateUniqueId();
+      needsUpdate = true;
+    }
+
+    seenIds.add(id);
+
+    // Queue update if needed (and if we have an ID column to write to)
+    if (needsUpdate && mapping.ID !== undefined) {
+      const rowNumber = index + 2; // Rows are 1-indexed, and data starts at Row 2
+      const colLetter = getColumnLetter(mapping.ID);
+      updates.push({
+        range: `Deck!${colLetter}${rowNumber}`,
+        values: [[id]]
+      });
+    }
+
+    const status = getVal(mapping.Status);
+
     // Logic for Priority
     const parsedPriority = parseInt(getVal(mapping.Priority));
     const priorityLevel = isNaN(parsedPriority) ? Number.MAX_SAFE_INTEGER : parsedPriority;
 
-    return {
+    cards.push({
       id: id,
       front: getVal(mapping.Front) || '',
       back: getVal(mapping.Back) || '',
@@ -163,8 +195,29 @@ export const loadCardsFromSheet = async (spreadsheetId: string): Promise<Card[]>
       currentStudyInterval: getVal(mapping.Interval) || null,
       status: status || 'Active',
       updatedAt: getVal(mapping.Updated),
-    };
-  }).filter((c: Card) => !!c.front && c.status !== 'Inactive');
+    });
+  });
+
+  // 3. Batch Update Fixes to Sheet (Fire and Forget-ish, but await to be safe)
+  if (updates.length > 0) {
+    // console.log(`Fixing ${updates.length} invalid/duplicate IDs in sheet...`);
+    try {
+      await window.gapi.client.sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId,
+        resource: {
+          valueInputOption: 'RAW',
+          data: updates
+        }
+      });
+      // console.log("ID fixes saved to sheet.");
+    } catch (e) {
+      console.error("Failed to save generated IDs to sheet:", e);
+      // We continue anyway, returning the cards with valid local IDs so the app works.
+      // The next reload might fix it or encounter the same issue if save failed.
+    }
+  }
+
+  return cards.filter((c: Card) => !!c.front && c.status !== 'Inactive');
 };
 
 /**
