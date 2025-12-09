@@ -15,6 +15,7 @@ interface HomeScreenProps {
   recentDecks: DeckHistoryItem[];
   onNavigateToAbout: () => void;
   onNavigateToSettings: () => void;
+  syncMessage?: string | null;
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -28,7 +29,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   isLoadingCards,
   recentDecks,
   onNavigateToAbout,
-  onNavigateToSettings
+  onNavigateToSettings,
+  syncMessage
 }) => {
   // Sheet Verification State
   const [sheetUrl, setSheetUrl] = useState('');
@@ -73,6 +75,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         </p>
 
         <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+
+          {/* Sync Message Display */}
+          {syncMessage && (
+            <div className="mb-4 bg-blue-900/40 border border-blue-700 text-blue-200 p-3 rounded-lg text-sm animate-pulse">
+              <p className="font-semibold">Status Update:</p>
+              <p>{syncMessage}</p>
+            </div>
+          )}
 
           {/* Authenticated State */}
           {currentUser ? (

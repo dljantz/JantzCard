@@ -71,7 +71,9 @@ export const useDeckManager = (): UseDeckManagerReturn => {
             try {
                 const strandedItems: Card[] = JSON.parse(strandedQueue);
                 if (strandedItems.length > 0) {
-                    console.warn(`Recovered ${strandedItems.length} items from interrupted session.`);
+                    const msg = `Recovered ${strandedItems.length} unsaved updates from interrupted session.`;
+                    console.warn(msg);
+                    setSyncMessage(msg);
                     // Convert Card[] to PendingCardUpdate[]
                     const recoveredUpdates: PendingCardUpdate[] = strandedItems.map(c => ({
                         id: c.id,

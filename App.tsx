@@ -125,6 +125,7 @@ const App: React.FC = () => {
           recentDecks={recentDecks}
           onNavigateToAbout={() => setAppState(AppState.About)}
           onNavigateToSettings={() => setAppState(AppState.Settings)}
+          syncMessage={syncMessage}
         />
       );
     }
@@ -170,6 +171,7 @@ const App: React.FC = () => {
             recentDecks={recentDecks}
             onNavigateToAbout={() => setAppState(AppState.About)}
             onNavigateToSettings={() => setAppState(AppState.Settings)}
+            syncMessage={syncMessage}
           />
         );
     }
