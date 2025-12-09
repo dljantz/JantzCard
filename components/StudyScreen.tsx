@@ -163,6 +163,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
 
   // Safe check for string existence before includes
   const isSavedLocallyWarning = saveError && saveError.includes && saveError.includes('saved to this device');
+  const isSuccessMessage = saveError === "Deck reloaded!";
 
   return (
     <div
@@ -221,10 +222,16 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
             </div>
           ) : saveError ? (
             <span
-              className={`flex items-center gap-1 font-semibold ${isSavedLocallyWarning ? 'text-orange-400' : 'text-red-400 animate-pulse'}`}
+              className={`flex items-center gap-1 font-semibold ${isSuccessMessage ? 'text-green-500' :
+                  isSavedLocallyWarning ? 'text-orange-400' : 'text-red-400 animate-pulse'
+                }`}
               title={saveError}
             >
-              {isSavedLocallyWarning ? (
+              {isSuccessMessage ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              ) : isSavedLocallyWarning ? (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
