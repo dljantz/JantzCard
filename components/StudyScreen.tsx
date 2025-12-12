@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Card, DataSource } from '../types';
 import Flashcard from './Flashcard';
 import IntervalSelector from './IntervalSelector';
+import ProgressBar from './ProgressBar';
 import { getProportionalOverdueness } from '../hooks/useStudyQueue';
 import { findClosestInterval } from '../utils/timeUtils';
 import { DEFAULT_CENTER_INTERVAL } from '../constants';
@@ -17,6 +18,7 @@ interface StudyScreenProps {
   isSaving: boolean;
   dataSource: DataSource;
   saveError: string | null;
+  initialQueueLength: number;
 }
 
 const StudyScreen: React.FC<StudyScreenProps> = ({
@@ -28,7 +30,8 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
   onReload,
   isSaving,
   dataSource,
-  saveError
+  saveError,
+  initialQueueLength
 }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [preselectedInterval, setPreselectedInterval] = useState<string | null>(null);
@@ -163,7 +166,8 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
 
   // Safe check for string existence before includes
   const isSavedLocallyWarning = saveError && saveError.includes && saveError.includes('saved to this device');
-  const isSuccessMessage = saveError === "Deck reloaded!";
+  const isSuccessMessage = saveError && (saveError === "Deck reloaded!" || saveError.toLowerCase().includes('success'));
+  const cardsCompleted = initialQueueLength - queue.length;
 
   return (
     <div
@@ -223,7 +227,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
           ) : saveError ? (
             <span
               className={`flex items-center gap-1 font-semibold ${isSuccessMessage ? 'text-green-500' :
-                  isSavedLocallyWarning ? 'text-orange-400' : 'text-red-400 animate-pulse'
+                isSavedLocallyWarning ? 'text-orange-400' : 'text-red-400 animate-pulse'
                 }`}
               title={saveError}
             >
@@ -254,6 +258,8 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
           )}
         </div>
       </header>
+
+      <ProgressBar current={cardsCompleted} total={initialQueueLength} />
 
       <main className="flex-grow flex items-center justify-center p-4 overflow-auto">
         {/* We remove the key prop to allow the same component instance to transition its CSS properties */}

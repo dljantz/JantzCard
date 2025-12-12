@@ -30,7 +30,21 @@ interface ColumnMapping {
   Updated?: number;
 }
 
+
 const REQUIRED_HEADERS = ['Front', 'Back'];
+const API_TIMEOUT_MS = 5000;
+
+/**
+ * Wraps a promise with a timeout.
+ */
+const withTimeout = <T>(promise: Promise<T>, ms: number = API_TIMEOUT_MS): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('Request timed out')), ms)
+    )
+  ]);
+};
 
 /**
  * Converts a zero-based column index to A1 notation column letter (e.g., 0 -> A, 26 -> AA).
@@ -61,10 +75,10 @@ export const getSpreadsheetTitle = async (spreadsheetId: string): Promise<string
     return "Unknown Deck";
   }
   try {
-    const response = await window.gapi.client.sheets.spreadsheets.get({
+    const response = await withTimeout<any>(window.gapi.client.sheets.spreadsheets.get({
       spreadsheetId,
       fields: 'properties.title'
-    });
+    }));
     return response.result.properties?.title || "Untitled Deck";
   } catch (e) {
     console.error("Failed to fetch sheet title", e);
@@ -86,10 +100,10 @@ const generateUniqueId = (): string => {
  * Fetches the header row (Row 1) and maps column names to indices.
  */
 const getColumnMapping = async (spreadsheetId: string): Promise<ColumnMapping> => {
-  const response = await window.gapi.client.sheets.spreadsheets.values.get({
+  const response = await withTimeout<any>(window.gapi.client.sheets.spreadsheets.values.get({
     spreadsheetId,
     range: 'Deck!1:1', // Fetch just the first row
-  });
+  }));
 
   const headers = response.result.values?.[0];
   if (!headers || headers.length === 0) {
@@ -125,10 +139,10 @@ export const loadCardsFromSheet = async (spreadsheetId: string): Promise<Card[]>
   const mapping = await getColumnMapping(spreadsheetId);
 
   // 2. Fetch Data (Row 2 onwards)
-  const response = await window.gapi.client.sheets.spreadsheets.values.get({
+  const response = await withTimeout<any>(window.gapi.client.sheets.spreadsheets.values.get({
     spreadsheetId,
     range: 'Deck!A2:ZZ', // Fetch a wide range to be safe
-  });
+  }));
 
   const rows = response.result.values;
   if (!rows || rows.length === 0) {
@@ -202,13 +216,13 @@ export const loadCardsFromSheet = async (spreadsheetId: string): Promise<Card[]>
   if (updates.length > 0) {
     // console.log(`Fixing ${updates.length} invalid/duplicate IDs in sheet...`);
     try {
-      await window.gapi.client.sheets.spreadsheets.values.batchUpdate({
+      await withTimeout(window.gapi.client.sheets.spreadsheets.values.batchUpdate({
         spreadsheetId,
         resource: {
           valueInputOption: 'RAW',
           data: updates
         }
-      });
+      }));
       // console.log("ID fixes saved to sheet.");
     } catch (e) {
       console.error("Failed to save generated IDs to sheet:", e);
@@ -224,11 +238,11 @@ export const loadCardsFromSheet = async (spreadsheetId: string): Promise<Card[]>
  * Helper to find the row index for a specific card.
  */
 const findRowForCard = async (spreadsheetId: string, card: Card, mapping: ColumnMapping): Promise<number | null> => {
-  const response = await window.gapi.client.sheets.spreadsheets.values.get({
+  const response = await withTimeout<any>(window.gapi.client.sheets.spreadsheets.values.get({
     spreadsheetId,
     range: 'Deck!A2:ZZ',
     majorDimension: 'ROWS'
-  });
+  }));
 
   const rows = response.result.values;
   if (!rows) return null;
@@ -279,10 +293,10 @@ export const updateCardInSheet = async (spreadsheetId: string, card: Card): Prom
   let shouldUpdate = true;
   if (mapping.Updated !== undefined) {
     const updatedColLetter = getColumnLetter(mapping.Updated);
-    const timeResponse = await window.gapi.client.sheets.spreadsheets.values.get({
+    const timeResponse = await withTimeout<any>(window.gapi.client.sheets.spreadsheets.values.get({
       spreadsheetId,
       range: `Deck!${updatedColLetter}${rowNumber}`
-    });
+    }));
     const remoteUpdated = timeResponse.result.values?.[0]?.[0];
 
     if (remoteUpdated && card.updatedAt) {
@@ -318,13 +332,13 @@ export const updateCardInSheet = async (spreadsheetId: string, card: Card): Prom
   addUpdate(mapping.Updated, card.updatedAt);
 
   if (updates.length > 0) {
-    await window.gapi.client.sheets.spreadsheets.values.batchUpdate({
+    await withTimeout(window.gapi.client.sheets.spreadsheets.values.batchUpdate({
       spreadsheetId,
       resource: {
         valueInputOption: 'RAW',
         data: updates
       }
-    });
+    }));
   }
 };
 
@@ -339,10 +353,10 @@ export const batchUpdateCards = async (spreadsheetId: string, updates: PendingCa
   const mapping = await getColumnMapping(spreadsheetId);
 
   // Fetch current rows to map IDs
-  const response = await window.gapi.client.sheets.spreadsheets.values.get({
+  const response = await withTimeout<any>(window.gapi.client.sheets.spreadsheets.values.get({
     spreadsheetId,
     range: 'Deck!A2:ZZ',
-  });
+  }));
   const rows = response.result.values || [];
 
   const data: any[] = [];
@@ -393,11 +407,11 @@ export const batchUpdateCards = async (spreadsheetId: string, updates: PendingCa
 
   if (data.length === 0) return;
 
-  await window.gapi.client.sheets.spreadsheets.values.batchUpdate({
+  await withTimeout(window.gapi.client.sheets.spreadsheets.values.batchUpdate({
     spreadsheetId,
     resource: {
       valueInputOption: 'RAW',
       data: data
     }
-  });
+  }));
 };

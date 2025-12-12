@@ -32,17 +32,22 @@ export interface UseDeckManagerReturn {
     reloadDeck: () => Promise<void>;
     updateCard: (card: Card) => Promise<void>;
     clearDeck: () => void;
+    initialQueueLength: number;
 }
 
 export const useDeckManager = (): UseDeckManagerReturn => {
     const [dataSource, setDataSource] = useState<DataSource>(DataSource.Mock);
     const [cards, setCards] = useState<Card[]>([]);
     const [queue, setQueue] = useState<string[]>([]);
+    const [initialQueueLength, setInitialQueueLength] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [syncMessage, setSyncMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pendingUpdates, setPendingUpdates] = useState<PendingCardUpdate[]>([]);
+
+    // Ref for pending updates to ensure synchronous access in loops
+    const pendingUpdatesRef = useRef<PendingCardUpdate[]>([]);
 
     // Queue for processing sequential saves
     const saveQueueRef = useRef<Card[]>([]);
@@ -50,6 +55,13 @@ export const useDeckManager = (): UseDeckManagerReturn => {
 
     // Internal Reference to Sheet ID (persisted in hook state for reload)
     const [currentSpreadsheetId, setCurrentSpreadsheetId] = useState<string | null>(null);
+
+    // Helper to update both state and ref and local storage
+    const updateBacklog = useCallback((newBacklog: PendingCardUpdate[]) => {
+        pendingUpdatesRef.current = newBacklog;
+        setPendingUpdates(newBacklog);
+        localStorage.setItem(BACKLOG_STORAGE_KEY, JSON.stringify(newBacklog));
+    }, []);
 
     // Load backlog and recover stranded active items on mount
     useEffect(() => {
@@ -83,8 +95,6 @@ export const useDeckManager = (): UseDeckManagerReturn => {
                     }));
 
                     // Merge, favoring recovered items if duplicates exist (they are newer)
-                    // Actually, let's just append and let the backlog processor handle duplicates/ordering if possible?
-                    // Better to filter out duplicates in initialBacklog that match recovered IDs
                     initialBacklog = [
                         ...initialBacklog.filter(b => !recoveredUpdates.some(r => r.id === b.id)),
                         ...recoveredUpdates
@@ -98,41 +108,59 @@ export const useDeckManager = (): UseDeckManagerReturn => {
             }
         }
 
+        // Initialize Ref and State
         if (initialBacklog.length > 0) {
-            setPendingUpdates(initialBacklog);
-            // We don't necessarily need to write to localStorage here because setPendingUpdates usually
-            // doesn't auto-persist. But our `updateBacklog` helper does. 
-            // Ideally we should persist the merged result immediately.
-            localStorage.setItem(BACKLOG_STORAGE_KEY, JSON.stringify(initialBacklog));
+            updateBacklog(initialBacklog);
         }
-    }, []);
 
-    // Persist backlog helper
-    const updateBacklog = (newBacklog: PendingCardUpdate[]) => {
-        setPendingUpdates(newBacklog);
-        localStorage.setItem(BACKLOG_STORAGE_KEY, JSON.stringify(newBacklog));
-    };
+        // 3. Restore Sheet ID if known, to allow background syncing
+        const savedUrl = localStorage.getItem('jantzcard_sheet_url');
+        if (savedUrl) {
+            const id = extractSpreadsheetId(savedUrl);
+            if (id) setCurrentSpreadsheetId(id);
+        }
+    }, [updateBacklog]);
 
     // Process Backlog Logic
-    const processBacklog = useCallback(async (spreadsheetId: string, updates: PendingCardUpdate[]) => {
-        if (updates.length === 0) return;
-        console.log(`Attempting to sync ${updates.length} pending updates...`);
+    const processBacklog = useCallback(async (spreadsheetId: string) => {
+        const currentUpdates = pendingUpdatesRef.current;
+        if (currentUpdates.length === 0) return;
+
+        console.log(`Attempting to sync ${currentUpdates.length} pending updates...`);
+        if (!isProcessingQueueRef.current) setSyncMessage(`Syncing ${currentUpdates.length} offline updates...`);
 
         try {
-            await batchUpdateCards(spreadsheetId, updates);
+            await batchUpdateCards(spreadsheetId, currentUpdates);
             updateBacklog([]);
+            if (!isProcessingQueueRef.current) setSyncMessage("Backlog synced successfully.");
+            setTimeout(() => { if (!isProcessingQueueRef.current) setSyncMessage(null); }, 3000);
             console.log("Backlog synced successfully.");
         } catch (err) {
             console.error("Backlog sync failed:", err);
+            // Keep them in backlog
         }
-    }, []);
+    }, [updateBacklog]);
+
+    // Cleanup interval on unmount
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const hasPending = pendingUpdatesRef.current.length > 0;
+            if (currentSpreadsheetId && hasPending && !isProcessingQueueRef.current && !isSaving) {
+                console.log("Triggering periodic background sync...");
+                processBacklog(currentSpreadsheetId);
+            }
+        }, 10000); // Check every 10 seconds
+
+        return () => clearInterval(interval);
+    }, [currentSpreadsheetId, isSaving, processBacklog]);
 
     // --- Actions ---
 
     const clearDeck = useCallback(() => {
-        setDataSource(DataSource.Mock); // Default back to known cleaning state? Or keep last.
+        setDataSource(DataSource.Mock);
         setCards([]);
         setQueue([]);
+        setInitialQueueLength(0);
         setError(null);
         setSyncMessage(null);
     }, []);
@@ -147,7 +175,9 @@ export const useDeckManager = (): UseDeckManagerReturn => {
             if (source === DataSource.Mock) {
                 const mockData = getMockData();
                 setCards(mockData);
-                setQueue(calculateStudyQueue(mockData));
+                const newQueue = calculateStudyQueue(mockData);
+                setQueue(newQueue);
+                setInitialQueueLength(newQueue.length);
                 setCurrentSpreadsheetId(null);
             } else {
                 // Sheet Loading
@@ -159,39 +189,35 @@ export const useDeckManager = (): UseDeckManagerReturn => {
                 setCurrentSpreadsheetId(spreadsheetId);
                 localStorage.setItem('jantzcard_sheet_url', url);
 
+                // 0. Try to sync backlog immediately before loading (if we have one)
+                if (pendingUpdatesRef.current.length > 0) {
+                    await processBacklog(spreadsheetId);
+                }
+
                 // 1. Load Data
                 const loadedCards = await loadCardsFromSheet(spreadsheetId);
                 if (loadedCards.length === 0) {
                     throw new Error("No cards found in sheet. Ensure data starts at Row 2.");
                 }
 
-                // 2. Merge Pending Updates
+                // 2. Re-apply any pending updates that FAILED to sync just now
                 let mergedCards = [...loadedCards];
-                if (pendingUpdates.length > 0) {
-                    setSyncMessage(`Syncing ${pendingUpdates.length} offline updates...`);
+                if (pendingUpdatesRef.current.length > 0) {
+                    const currentUpdates = pendingUpdatesRef.current;
+                    setSyncMessage(`Syncing ${currentUpdates.length} offline updates...`); // Show persistent msg
                     mergedCards = loadedCards.map(c => {
-                        const pending = pendingUpdates.find(p => p.id === c.id);
+                        const pending = currentUpdates.find(p => p.id === c.id);
                         return pending ? { ...c, lastSeen: pending.lastSeen, currentStudyInterval: pending.currentStudyInterval } : c;
                     });
-
-                    // Try to sync backlog immediately
-                    await processBacklog(spreadsheetId, pendingUpdates);
-                    setSyncMessage(null);
                 }
 
                 setCards(mergedCards);
                 const newQueue = calculateStudyQueue(mergedCards);
-                if (newQueue.length === 0) {
-                    // Not necessarily an error, just means user is done. But traditionally we treated it as "Check back later"
-                    // Let's not throw, but maybe show a message or just empty queue.
-                    // The UI handles empty queue as "Finished" if triggered during study, but on load it might look empty.
-                    // Let's set error if TRULY empty and not just "done for today"? 
-                    // Actually, `calculateStudyQueue` filters for overdue. If none overdue, queue is empty.
-                    if (loadedCards.length > 0) {
-                        setError("No overdue cards found! Check back later.");
-                    }
+                if (newQueue.length === 0 && loadedCards.length > 0) {
+                    setError("No overdue cards found! Check back later.");
                 }
                 setQueue(newQueue);
+                setInitialQueueLength(newQueue.length);
 
                 // History Update (Fire and forget)
                 getSpreadsheetTitle(spreadsheetId)
@@ -201,11 +227,11 @@ export const useDeckManager = (): UseDeckManagerReturn => {
         } catch (err: any) {
             console.error(err);
             setError(err.message || "Failed to load deck");
-            setDataSource(DataSource.Mock); // Fallback? Or stay on Sheet but error?
+            setDataSource(DataSource.Mock);
         } finally {
             setIsLoading(false);
         }
-    }, [pendingUpdates, processBacklog]);
+    }, [processBacklog]);
 
     const reloadDeck = useCallback(async () => {
         if (dataSource !== DataSource.Sheet || !currentSpreadsheetId) return;
@@ -215,23 +241,24 @@ export const useDeckManager = (): UseDeckManagerReturn => {
 
         try {
             // Sync existing backlog first
-            if (pendingUpdates.length > 0) {
-                await processBacklog(currentSpreadsheetId, pendingUpdates);
-            }
+            await processBacklog(currentSpreadsheetId);
 
             const loadedCards = await loadCardsFromSheet(currentSpreadsheetId);
 
             let finalCards = loadedCards;
             // Re-apply backlog if sync failed
-            if (pendingUpdates.length > 0) {
+            if (pendingUpdatesRef.current.length > 0) {
+                const currentUpdates = pendingUpdatesRef.current;
                 finalCards = loadedCards.map(c => {
-                    const pending = pendingUpdates.find(p => p.id === c.id);
+                    const pending = currentUpdates.find(p => p.id === c.id);
                     return pending ? { ...c, lastSeen: pending.lastSeen, currentStudyInterval: pending.currentStudyInterval } : c;
                 });
             }
 
             setCards(finalCards);
-            setQueue(calculateStudyQueue(finalCards));
+            const newQueue = calculateStudyQueue(finalCards);
+            setQueue(newQueue);
+            setInitialQueueLength(newQueue.length);
             setSyncMessage("Deck reloaded!");
             setTimeout(() => setSyncMessage(null), 2000);
 
@@ -240,7 +267,7 @@ export const useDeckManager = (): UseDeckManagerReturn => {
         } finally {
             setIsLoading(false);
         }
-    }, [dataSource, currentSpreadsheetId, pendingUpdates, processBacklog]);
+    }, [dataSource, currentSpreadsheetId, processBacklog]);
 
     // Unified process for handling the save queue
     const processSaveQueue = useCallback(async () => {
@@ -261,20 +288,32 @@ export const useDeckManager = (): UseDeckManagerReturn => {
                     continue;
                 }
 
-                if (!currentSpreadsheetId) {
-                    throw new Error("Spreadsheet ID lost");
+                let targetSheetId = currentSpreadsheetId;
+                if (!targetSheetId) {
+                    // Try to recover ID from local storage if lost (e.g. reload)
+                    const savedUrl = localStorage.getItem('jantzcard_sheet_url');
+                    targetSheetId = savedUrl ? extractSpreadsheetId(savedUrl) : null;
+                    if (!targetSheetId) throw new Error("Spreadsheet ID lost");
+                    setCurrentSpreadsheetId(targetSheetId); // Update state for next time
                 }
 
+
                 try {
-                    await updateCardInSheet(currentSpreadsheetId, nextCard);
+                    await updateCardInSheet(targetSheetId, nextCard);
 
                     // Success! Remove from queue
                     saveQueueRef.current.shift();
                     localStorage.setItem(ACTIVE_QUEUE_STORAGE_KEY, JSON.stringify(saveQueueRef.current));
 
                     // If successful, try to clear any remaining backlog from offline usage
-                    if (pendingUpdates.length > 0) {
-                        await processBacklog(currentSpreadsheetId, pendingUpdates);
+                    if (pendingUpdatesRef.current.length > 0) {
+                        try {
+                            await batchUpdateCards(targetSheetId, pendingUpdatesRef.current);
+                            updateBacklog([]);
+                            console.log("Backlog cleared after successful save.");
+                        } catch (e) {
+                            console.warn("Failed to clear backlog in invalid connectivity window", e);
+                        }
                     }
                 } catch (sheetError: any) {
                     // Failed for this specific card
@@ -283,10 +322,7 @@ export const useDeckManager = (): UseDeckManagerReturn => {
 
                     if (sheetError instanceof RowNotFoundError) {
                         console.warn("Card deleted remotely. Removing from backlog.");
-                        // It might have been added to pendingUpdates in a previous life? 
-                        // But here we are just failing the live save.
-                        // Ensure it's not in backlog either
-                        const newBacklog = pendingUpdates.filter(p => p.id !== nextCard.id);
+                        const newBacklog = pendingUpdatesRef.current.filter(p => p.id !== nextCard.id);
                         updateBacklog(newBacklog);
                         setSyncMessage("Sync skipped: Card deleted remotely.");
                     } else {
@@ -297,8 +333,8 @@ export const useDeckManager = (): UseDeckManagerReturn => {
                             currentStudyInterval: nextCard.currentStudyInterval,
                             updatedAt: nextCard.updatedAt
                         };
-                        // Add to persistent backlog
-                        const newBacklog = [...pendingUpdates.filter(p => p.id !== pending.id), pending];
+                        // Add to persistent backlog using REF to ensure we don't lose previous failures in this loop
+                        const newBacklog = [...pendingUpdatesRef.current.filter(p => p.id !== pending.id), pending];
                         updateBacklog(newBacklog);
                     }
                 }
@@ -314,7 +350,7 @@ export const useDeckManager = (): UseDeckManagerReturn => {
                 localStorage.removeItem(ACTIVE_QUEUE_STORAGE_KEY);
             }
         }
-    }, [dataSource, currentSpreadsheetId, pendingUpdates, processBacklog]);
+    }, [dataSource, currentSpreadsheetId, processBacklog, updateBacklog]);
 
     // Local override to avoid excessive API calls
     const hasUpdatedStreakRef = useRef(false);
@@ -359,6 +395,7 @@ export const useDeckManager = (): UseDeckManagerReturn => {
         loadDeck,
         reloadDeck,
         updateCard,
-        clearDeck
+        clearDeck,
+        initialQueueLength
     };
 };

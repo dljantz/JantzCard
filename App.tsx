@@ -28,7 +28,8 @@ const App: React.FC = () => {
     loadDeck,
     reloadDeck,
     updateCard,
-    clearDeck
+    clearDeck,
+    initialQueueLength
   } = useDeckManager();
 
   const {
@@ -149,6 +150,7 @@ const App: React.FC = () => {
             isSaving={isDeckSaving}
             dataSource={dataSource}
             saveError={getSaveStatusMessage()}
+            initialQueueLength={initialQueueLength}
           />
         );
       case AppState.Finished:

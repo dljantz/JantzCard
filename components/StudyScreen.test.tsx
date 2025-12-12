@@ -24,7 +24,8 @@ describe('StudyScreen Interval Selection', () => {
         onReload: vi.fn(),
         isSaving: false,
         dataSource: DataSource.Sheet,
-        saveError: null
+        saveError: null,
+        initialQueueLength: 10
     };
 
     it('should switch selection when a different interval is selected while flipped', () => {

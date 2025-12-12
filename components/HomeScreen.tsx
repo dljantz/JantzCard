@@ -158,7 +158,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
           {/* Sync Message Display */}
           {syncMessage && (
-            <div className="mb-4 bg-blue-900/40 border border-blue-700 text-blue-200 p-3 rounded-lg text-sm animate-pulse">
+            <div className={`mb-4 px-3 py-3 rounded-lg text-sm animate-pulse border ${
+              // Success State
+              syncMessage.toLowerCase().includes('success') || syncMessage.toLowerCase().includes('reloaded!')
+                ? 'bg-green-900/40 border-green-700 text-green-200'
+                : // Error State
+                syncMessage.toLowerCase().includes('error') || syncMessage.toLowerCase().includes('failed') || syncMessage.toLowerCase().includes('skipped')
+                  ? 'bg-red-900/40 border-red-700 text-red-200'
+                  : // Default/Info State (Blue)
+                  'bg-blue-900/40 border-blue-700 text-blue-200'
+              }`}>
               <p className="font-semibold">Status Update:</p>
               <p>{syncMessage}</p>
             </div>
