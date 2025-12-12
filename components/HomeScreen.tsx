@@ -180,35 +180,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 <p className="text-green-400 text-sm mt-1">Successfully authenticated with Google</p>
               </div>
 
-              {/* Sheet Configuration Area */}
-              <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-600 text-left space-y-4">
-                <h3 className="text-lg font-semibold text-gray-200 border-b border-gray-700 pb-2">Connect New Study Deck</h3>
-
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Google Sheet URL</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={sheetUrl}
-                      onChange={(e) => setSheetUrl(e.target.value)}
-                      placeholder="https://docs.google.com/spreadsheets/d/..."
-                      className="flex-grow bg-gray-800 border border-gray-600 rounded p-2 text-white text-sm focus:border-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Paste the URL of a sheet you have access to. It must have a tab named <strong>Deck</strong>.</p>
-                </div>
-
-
-
-                {/* Auth Error passed from Parent */}
-                {authError && (
-                  <div className="bg-red-900/20 border border-red-800 p-3 rounded text-sm text-red-300 break-words">
-                    <p className="font-bold">System Error:</p>
-                    <p>{authError}</p>
-                  </div>
-                )}
-              </div>
-
               {/* Recent Decks */}
               {recentDecks.length > 0 && (
                 <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-600 text-left space-y-4">
@@ -242,6 +213,35 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Sheet Configuration Area */}
+              <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-600 text-left space-y-4">
+                <h3 className="text-lg font-semibold text-gray-200 border-b border-gray-700 pb-2">Connect New Study Deck</h3>
+
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Google Sheet URL</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={sheetUrl}
+                      onChange={(e) => setSheetUrl(e.target.value)}
+                      placeholder="https://docs.google.com/spreadsheets/d/..."
+                      className="flex-grow bg-gray-800 border border-gray-600 rounded p-2 text-white text-sm focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Paste the URL of a sheet you have access to. It must have a tab named <strong>Deck</strong>.</p>
+                </div>
+
+
+
+                {/* Auth Error passed from Parent */}
+                {authError && (
+                  <div className="bg-red-900/20 border border-red-800 p-3 rounded text-sm text-red-300 break-words">
+                    <p className="font-bold">System Error:</p>
+                    <p>{authError}</p>
+                  </div>
+                )}
+              </div>
 
               <div className="flex flex-col gap-3">
                 <button

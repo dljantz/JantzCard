@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { updateStreak } from './driveService';
+import { updateStreak, resetCache } from './driveService';
 
 // Mock GAPI and Fetch
 const mockGapi = {
@@ -21,6 +21,7 @@ const mockFetch = vi.fn();
 
 describe('driveService.updateStreak', () => {
     beforeEach(() => {
+        resetCache();
         vi.stubGlobal('window', { gapi: mockGapi });
         vi.stubGlobal('fetch', mockFetch);
         vi.useFakeTimers();

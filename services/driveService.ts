@@ -24,11 +24,22 @@ export interface HistoryFileContent {
     streak?: StreakInfo;
 }
 
+// In-memory cache
+let cachedFileId: string | null = null;
+let cachedHistory: HistoryFileContent | null = null;
+
+export const resetCache = () => {
+    cachedFileId = null;
+    cachedHistory = null;
+};
+
 /**
  * Searches for the config file in the user's Drive.
  * Returns the file ID if found, null otherwise.
  */
 export const searchConfigFile = async (): Promise<string | null> => {
+    if (cachedFileId) return cachedFileId;
+
     if (!window.gapi?.client?.drive) {
         console.error("Google Drive API not loaded");
         return null;
@@ -44,7 +55,8 @@ export const searchConfigFile = async (): Promise<string | null> => {
 
         const files = response.result.files;
         if (files && files.length > 0) {
-            return files[0].id;
+            cachedFileId = files[0].id;
+            return cachedFileId;
         }
         return null;
     } catch (err) {
@@ -80,6 +92,8 @@ export const createConfigFile = async (): Promise<string> => {
 
     const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', fetchOptions);
     const file = await res.json();
+    cachedFileId = file.id;
+    cachedHistory = content;
     return file.id;
 };
 
@@ -92,7 +106,10 @@ export const readConfigFile = async (fileId: string): Promise<HistoryFileContent
             fileId: fileId,
             alt: 'media',
         });
-        return response.result as HistoryFileContent;
+        const data = response.result as HistoryFileContent;
+        // We do NOT automatically set cachedHistory here to avoid overwriting optimistic updates with stale server data.
+        // Cache management is handled in getHistory/updateStreak.
+        return data;
     } catch (err) {
         console.error("Error reading config file", err);
         return { recentDecks: [] };
@@ -103,6 +120,9 @@ export const readConfigFile = async (fileId: string): Promise<HistoryFileContent
  * Updates the config file with new history.
  */
 export const updateConfigFile = async (fileId: string, content: HistoryFileContent): Promise<void> => {
+    // Update cache immediately (Write-through)
+    cachedHistory = content;
+
     const fetchOptions = {
         method: 'PATCH',
         headers: new Headers({
@@ -135,7 +155,12 @@ export const addToHistory = async (deck: DeckHistoryItem): Promise<DeckHistoryIt
         fileId = await createConfigFile();
     }
 
-    const currentData = await readConfigFile(fileId);
+    // Use cached history if available to avoid read
+    let currentData = cachedHistory;
+    if (!currentData) {
+        currentData = await readConfigFile(fileId);
+    }
+
     let history = currentData.recentDecks || [];
 
     // Remove existing entry if present (to bump to top)
@@ -150,11 +175,13 @@ export const addToHistory = async (deck: DeckHistoryItem): Promise<DeckHistoryIt
     // Preserve existing streak info
     const streakInfo = currentData.streak || { count: 0, lastStudyDate: "" };
 
-    await updateConfigFile(fileId, {
+    const newData = {
         _readme: currentData._readme || "This file stores your JantzCard session history. Please do not edit it manually.",
         recentDecks: history,
         streak: streakInfo
-    });
+    };
+
+    await updateConfigFile(fileId, newData);
     return history;
 };
 
@@ -171,8 +198,35 @@ export const getHistory = async (): Promise<HistoryFileContent> => {
     const fileId = await searchConfigFile();
     if (!fileId) return { recentDecks: [] };
 
-    const data = await readConfigFile(fileId);
-    return data;
+    const remoteData = await readConfigFile(fileId);
+
+    // Merge Strategy:
+    // If we have a local cache that is "fresher" (specifically for streak), prefer it.
+    // For deck history, remote usually wins (or we assume append only, but let's stick to remote for decks for now).
+    // The main issue is the Streak Race Condition.
+
+    let mergedData = { ...remoteData };
+
+    if (cachedHistory && cachedHistory.streak) {
+        const localDate = cachedHistory.streak.lastStudyDate;
+        const remoteDate = remoteData.streak?.lastStudyDate || "";
+
+        // If local thinks it's Today, and remote thinks it's Yesterday, LOCAL WINS.
+        // Simple string comparison works for YYYY-MM-DD (2025-12-12 > 2025-12-11)
+        if (localDate > remoteDate) {
+            mergedData.streak = cachedHistory.streak;
+        }
+        // If equal, prefer local just in case count is higher (e.g. recovery)? 
+        // Actually if dates are equal, the counts should match or remote might be from another device. 
+        // But for "User just clicked Home", local is authoritative.
+        else if (localDate === remoteDate && cachedHistory.streak.count >= (remoteData.streak?.count || 0)) {
+            mergedData.streak = cachedHistory.streak;
+        }
+    }
+
+    // Update Cache
+    cachedHistory = mergedData;
+    return mergedData;
 };
 
 /**
@@ -198,7 +252,11 @@ export const updateStreak = async (): Promise<StreakInfo | null> => {
         fileId = await createConfigFile();
     }
 
-    const currentData = await readConfigFile(fileId);
+    // Use cached history to be instantaneous
+    let currentData = cachedHistory;
+    if (!currentData) {
+        currentData = await readConfigFile(fileId);
+    }
 
     // Use Local Time for "Today"
     // This ensures that 11:55 PM and 12:05 AM are treated as different days based on user's clock
@@ -238,7 +296,7 @@ export const updateStreak = async (): Promise<StreakInfo | null> => {
             // Consecutive day
             newCount = currentStreak.count + 1;
         } else if (diffDays === 0) {
-            // Same day (duplicate check covered above but good for safety)
+            // Same day
             newCount = currentStreak.count;
         } else {
             // Streak broken
@@ -251,10 +309,20 @@ export const updateStreak = async (): Promise<StreakInfo | null> => {
         lastStudyDate: today
     };
 
-    await updateConfigFile(fileId, {
+    const newData = {
         ...currentData,
         streak: newStreak
-    });
+    };
+
+    // Update cache immediately (before write) so getHistory sees it
+    cachedHistory = newData;
+
+    // Fire async write
+    // Note: We await it here so the Promise resolves when write is done, 
+    // but the UI (useDeckManager) doesn't await this function anyway. 
+    // IMPORTANT: Even if this hangs, cachedHistory is already set.
+    await updateConfigFile(fileId, newData);
 
     return newStreak;
 };
+
