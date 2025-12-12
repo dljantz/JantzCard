@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { updateStreak, HistoryFileContent } from './driveService';
+import { updateStreak } from './driveService';
 
 // Mock GAPI and Fetch
 const mockGapi = {
