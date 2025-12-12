@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleUser } from '../types';
-import { DeckHistoryItem } from '../services/driveService';
+import { DeckHistoryItem, StreakInfo } from '../services/driveService';
 import RecentDeckItem from './RecentDeckItem';
 import { loadCardsFromSheet } from '../services/sheetService';
 import { calculateStudyQueue } from '../hooks/useStudyQueue';
@@ -15,6 +15,7 @@ interface HomeScreenProps {
   isAuthReady: boolean;
   isLoadingCards: boolean;
   recentDecks: DeckHistoryItem[];
+  streak?: StreakInfo;
   onNavigateToAbout: () => void;
   onNavigateToSettings: () => void;
   syncMessage?: string | null;
@@ -30,6 +31,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   isAuthReady,
   isLoadingCards,
   recentDecks,
+  streak,
   onNavigateToAbout,
   onNavigateToSettings,
   syncMessage
@@ -168,7 +170,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               <div className="flex flex-col items-center">
                 <img src={currentUser.picture} alt="Profile" className="w-16 h-16 rounded-full mb-3 border-2 border-green-400" />
                 <h3 className="text-2xl text-white font-semibold">Hi, {currentUser.name}!</h3>
-                <p className="text-green-400 text-sm">Successfully authenticated with Google</p>
+                {/* Streak Badge */}
+                <div className={`mt-2 flex items-center gap-2 px-3 py-1 rounded-full border ${streak && streak.count > 0 ? 'bg-orange-900/30 border-orange-700/50' : 'bg-gray-800 border-gray-700'}`}>
+                  <span className={`text-lg ${streak && streak.count > 0 ? '' : 'grayscale opacity-50'}`}>🔥</span>
+                  <span className={`font-bold ${streak && streak.count > 0 ? 'text-orange-300' : 'text-gray-400'}`}>
+                    {streak ? streak.count : 0} Day Streak
+                  </span>
+                </div>
+                <p className="text-green-400 text-sm mt-1">Successfully authenticated with Google</p>
               </div>
 
               {/* Sheet Configuration Area */}

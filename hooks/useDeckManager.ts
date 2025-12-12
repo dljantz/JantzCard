@@ -12,7 +12,7 @@ import {
     PendingCardUpdate,
     RowNotFoundError
 } from '../services/sheetService';
-import { addToHistory } from '../services/driveService';
+import { addToHistory, updateStreak } from '../services/driveService';
 
 const BACKLOG_STORAGE_KEY = 'jantzcard_pending_sheet_updates';
 const ACTIVE_QUEUE_STORAGE_KEY = 'jantzcard_active_save_queue';
@@ -316,6 +316,9 @@ export const useDeckManager = (): UseDeckManagerReturn => {
         }
     }, [dataSource, currentSpreadsheetId, pendingUpdates, processBacklog]);
 
+    // Local override to avoid excessive API calls
+    const hasUpdatedStreakRef = useRef(false);
+
     const updateCard = useCallback(async (updatedCard: Card) => {
         // Inject timestamp for conflict resolution
         updatedCard.updatedAt = new Date().toISOString();
@@ -330,6 +333,14 @@ export const useDeckManager = (): UseDeckManagerReturn => {
         localStorage.setItem(ACTIVE_QUEUE_STORAGE_KEY, JSON.stringify(saveQueueRef.current));
 
         processSaveQueue();
+
+        // Update Streak (fire and forget, once per session/load)
+        // We only try once per session to save bandwidth, 
+        // assuming the user doesn't cross midnight during a single page load often.
+        if (!hasUpdatedStreakRef.current && dataSource === DataSource.Sheet) {
+            hasUpdatedStreakRef.current = true;
+            updateStreak().catch((e: any) => console.error("Failed to update streak", e));
+        }
 
     }, [cards, dataSource, currentSpreadsheetId, processSaveQueue]);
 

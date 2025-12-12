@@ -8,11 +8,12 @@ import StudyScreen from './components/StudyScreen';
 import CompletionScreen from './components/CompletionScreen';
 import AboutScreen from './components/AboutScreen';
 import SettingsScreen from './components/SettingsScreen';
-import { getHistory, DeckHistoryItem } from './services/driveService';
+import { getHistory, DeckHistoryItem, StreakInfo } from './services/driveService';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.Home);
   const [recentDecks, setRecentDecks] = useState<DeckHistoryItem[]>([]);
+  const [streak, setStreak] = useState<StreakInfo | undefined>(undefined);
 
   // Custom Hooks
   const {
@@ -41,14 +42,18 @@ const App: React.FC = () => {
     checkSession
   } = useGoogleAuth();
 
-  // Load History
+  // Load History on Login and Return to Home
   useEffect(() => {
-    if (currentUser) {
-      getHistory().then(setRecentDecks);
-    } else {
+    if (currentUser && appState === AppState.Home) {
+      getHistory().then(data => {
+        setRecentDecks(data.recentDecks);
+        setStreak(data.streak);
+      });
+    } else if (!currentUser) {
       setRecentDecks([]);
+      setStreak(undefined);
     }
-  }, [currentUser]);
+  }, [currentUser, appState]);
 
   // Reactive Session Check (On Error)
   useEffect(() => {
@@ -123,6 +128,7 @@ const App: React.FC = () => {
           isAuthReady={isReady}
           isLoadingCards={isDeckLoading}
           recentDecks={recentDecks}
+          streak={streak}
           onNavigateToAbout={() => setAppState(AppState.About)}
           onNavigateToSettings={() => setAppState(AppState.Settings)}
           syncMessage={syncMessage}
@@ -169,6 +175,7 @@ const App: React.FC = () => {
             isAuthReady={isReady}
             isLoadingCards={isDeckLoading && dataSource === DataSource.Sheet}
             recentDecks={recentDecks}
+            streak={streak}
             onNavigateToAbout={() => setAppState(AppState.About)}
             onNavigateToSettings={() => setAppState(AppState.Settings)}
             syncMessage={syncMessage}

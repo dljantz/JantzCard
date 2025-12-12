@@ -13,6 +13,17 @@ export interface HistoryFileContent {
     recentDecks: DeckHistoryItem[];
 }
 
+export interface StreakInfo {
+    count: number;
+    lastStudyDate: string; // YYYY-MM-DD
+}
+
+export interface HistoryFileContent {
+    _readme?: string;
+    recentDecks: DeckHistoryItem[];
+    streak?: StreakInfo;
+}
+
 /**
  * Searches for the config file in the user's Drive.
  * Returns the file ID if found, null otherwise.
@@ -51,9 +62,10 @@ export const createConfigFile = async (): Promise<string> => {
         mimeType: MIME_TYPE,
     };
 
-    const content = {
+    const content: HistoryFileContent = {
         _readme: "This file stores your JantzCard session history. Please do not edit it manually.",
-        recentDecks: []
+        recentDecks: [],
+        streak: { count: 0, lastStudyDate: "" }
     };
 
     const form = new FormData();
@@ -110,9 +122,6 @@ export const updateConfigFile = async (fileId: string, content: HistoryFileConte
 export const addToHistory = async (deck: DeckHistoryItem): Promise<DeckHistoryItem[]> => {
     // 1. Ensure Drive API is loaded
     if (!window.gapi?.client || !window.gapi.client.drive) {
-        // Attempt to load it if not ready? For now, assume App.tsx initializes it.
-        // If we are strictly following the hooks pattern, we might need to check this better.
-        // But let's proceed assuming the scope grant was successful.
         try {
             await window.gapi.client.load('drive', 'v3');
         } catch (e) {
@@ -138,26 +147,114 @@ export const addToHistory = async (deck: DeckHistoryItem): Promise<DeckHistoryIt
     // Limit to 10 items
     if (history.length > 10) history = history.slice(0, 10);
 
+    // Preserve existing streak info
+    const streakInfo = currentData.streak || { count: 0, lastStudyDate: "" };
+
     await updateConfigFile(fileId, {
         _readme: currentData._readme || "This file stores your JantzCard session history. Please do not edit it manually.",
-        recentDecks: history
+        recentDecks: history,
+        streak: streakInfo
     });
     return history;
 };
 
-export const getHistory = async (): Promise<DeckHistoryItem[]> => {
+export const getHistory = async (): Promise<HistoryFileContent> => {
     if (!window.gapi?.client?.drive) {
         try {
             await window.gapi.client.load('drive', 'v3');
         } catch (e) {
             console.error("Failed to load Drive API", e);
-            return [];
+            return { recentDecks: [] };
         }
     }
 
     const fileId = await searchConfigFile();
-    if (!fileId) return [];
+    if (!fileId) return { recentDecks: [] };
 
     const data = await readConfigFile(fileId);
-    return data.recentDecks || [];
+    return data;
+};
+
+/**
+ * Check and update streak.
+ * Logic:
+ * - If lastStudyDate == today: Do nothing.
+ * - If lastStudyDate == yesterday: Increment streak, update date.
+ * - If lastStudyDate < yesterday: Reset streak to 1, update date.
+ * - If lastStudyDate == "": Set streak to 1, update date.
+ */
+export const updateStreak = async (): Promise<StreakInfo | null> => {
+    if (!window.gapi?.client?.drive) {
+        try {
+            await window.gapi.client.load('drive', 'v3');
+        } catch (e) {
+            console.error("Failed to load Drive API", e);
+            return null;
+        }
+    }
+
+    let fileId = await searchConfigFile();
+    if (!fileId) {
+        fileId = await createConfigFile();
+    }
+
+    const currentData = await readConfigFile(fileId);
+
+    // Use Local Time for "Today"
+    // This ensures that 11:55 PM and 12:05 AM are treated as different days based on user's clock
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const today = `${year}-${month}-${day}`;
+
+    let currentStreak = currentData.streak || { count: 0, lastStudyDate: "" };
+
+    if (currentStreak.lastStudyDate === today) {
+        // Already studied today
+        return currentStreak;
+    }
+
+    // Calculate difference in days
+    // We treat the stored date string as a local date (midnight start of that day)
+    // and compare it to today's local date (midnight start of today).
+
+    // Helper to parse YYYY-MM-DD as local midnight date object
+    const parseLocalYMD = (ymd: string) => {
+        const [y, m, d] = ymd.split('-').map(Number);
+        return new Date(y, m - 1, d);
+    };
+
+    const lastDate = currentStreak.lastStudyDate ? parseLocalYMD(currentStreak.lastStudyDate) : null;
+    const todayDate = parseLocalYMD(today);
+
+    let newCount = 1;
+
+    if (lastDate) {
+        const diffTime = Math.abs(todayDate.getTime() - lastDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 1) {
+            // Consecutive day
+            newCount = currentStreak.count + 1;
+        } else if (diffDays === 0) {
+            // Same day (duplicate check covered above but good for safety)
+            newCount = currentStreak.count;
+        } else {
+            // Streak broken
+            newCount = 1;
+        }
+    }
+
+    const newStreak: StreakInfo = {
+        count: newCount,
+        lastStudyDate: today
+    };
+
+    await updateConfigFile(fileId, {
+        ...currentData,
+        streak: newStreak
+    });
+
+    return newStreak;
 };
