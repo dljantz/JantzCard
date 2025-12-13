@@ -114,42 +114,43 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
     }
   };
 
-  const getCyclingHandlers = (interval: string | null, isMin: boolean, isMax: boolean) => {
+  const getButtonHandlers = (interval: string | null, isMin: boolean, isMax: boolean) => {
     if (isDisabled || !interval) return {};
 
-    // Edge case: don't cycle if already at absolute limits
-    if (isMin && interval === intervalLabels[0]) return {};
-    if (isMax && interval === intervalLabels[intervalLabels.length - 1]) return {};
+    const handlers: any = {};
 
-    // Use current overrides if available, otherwise use the passed interval
-    // Actually, the 'interval' passed here IS the one currently being rendered (which includes overrides)
-    // So we can just pass 'interval' to stopCycling
+    // CYCLING LOGIC: Start cycling on MouseDown/TouchStart if applicable
+    // ----------------------------------------------------------------
+    // Only cycle if NOT at absolute limits (or if overrides allow, but logic below handles limits)
+    const canCycleMin = isMin && interval !== intervalLabels[0];
+    const canCycleMax = isMax && interval !== intervalLabels[intervalLabels.length - 1];
 
-    if (isMin) {
-      return {
-        onMouseDown: () => startCycling(interval, 'down'),
-        onMouseUp: () => stopCycling(interval),
-        onMouseLeave: () => stopCycling(), // Don't select on leave, just stop
-        onTouchStart: () => startCycling(interval, 'down'),
-        onTouchEnd: (e: React.TouchEvent) => {
-          e.preventDefault(); // Prevent ghost clicks
-          stopCycling(interval);
-        },
-      };
+    if (canCycleMin) {
+      handlers.onMouseDown = () => startCycling(interval, 'down');
+      handlers.onTouchStart = () => startCycling(interval, 'down');
+    } else if (canCycleMax) {
+      handlers.onMouseDown = () => startCycling(interval, 'up');
+      handlers.onTouchStart = () => startCycling(interval, 'up');
     }
-    if (isMax) {
-      return {
-        onMouseDown: () => startCycling(interval, 'up'),
-        onMouseUp: () => stopCycling(interval),
-        onMouseLeave: () => stopCycling(),
-        onTouchStart: () => startCycling(interval, 'up'),
-        onTouchEnd: (e: React.TouchEvent) => {
-          e.preventDefault();
-          stopCycling(interval);
-        },
-      };
-    }
-    return {};
+
+    // SELECTION LOGIC: Select on MouseUp/TouchEnd
+    // -------------------------------------------
+    // This applies to ALL buttons to ensure consistent "select on release" behavior
+    // and to fix the mobile sticky hover issue via preventDefault.
+
+    handlers.onMouseUp = () => stopCycling(interval);
+
+    handlers.onMouseLeave = () => stopCycling();
+
+    handlers.onTouchEnd = (e: React.TouchEvent) => {
+      // STOP MOUSE EMULATION (Fixes Sticky Hover Issue)
+      // By calling preventDefault, we stop the browser from firing mousedown/mouseup/click
+      // after the touch event, preventing the button from staying in a :hover state.
+      if (e.cancelable) e.preventDefault();
+      stopCycling(interval);
+    };
+
+    return handlers;
   };
 
   const getButtonTooltip = (interval: string | null, isCenter: boolean, isMin: boolean, isMax: boolean) => {
@@ -225,7 +226,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
               title={getButtonTooltip(interval, isCenter, isMin, isMax)}
               disabled={isDisabled}
               isBold={interval === lastIntendedInterval}
-              {...getCyclingHandlers(interval, isMin, isMax)}
+              {...getButtonHandlers(interval, isMin, isMax)}
             />
           );
         })}
@@ -258,7 +259,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
                 title={getButtonTooltip(interval, false, isMin, false)}
                 disabled={isDisabled}
                 isBold={interval === lastIntendedInterval}
-                {...getCyclingHandlers(interval, isMin, false)}
+                {...getButtonHandlers(interval, isMin, false)}
               />
             );
           })}
@@ -284,6 +285,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
             size="default"
             disabled={isDisabled}
             isBold={centerInterval === lastIntendedInterval}
+            {...getButtonHandlers(centerInterval, false, false)}
           />
         </div>
 
@@ -309,7 +311,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
                 title={getButtonTooltip(interval, false, false, isMax)}
                 disabled={isDisabled}
                 isBold={interval === lastIntendedInterval}
-                {...getCyclingHandlers(interval, false, isMax)}
+                {...getButtonHandlers(interval, false, isMax)}
               />
             )
           })}
