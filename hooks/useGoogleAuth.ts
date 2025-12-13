@@ -22,6 +22,9 @@ export const useGoogleAuth = () => {
 
   const tokenClientRef = useRef<any>(null);
 
+  // Ref to hold the resolve function for the pending token request (for ensureToken)
+  const pendingTokenResolve = useRef<((token: string) => void) | null>(null);
+
   const [currentUser, setCurrentUser] = useState<GoogleUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,12 +75,9 @@ export const useGoogleAuth = () => {
       });
     } catch (gapiErr: any) {
       console.error('GAPI client init failed', gapiErr);
-      // CRITICAL CHANGE: Surface this error so the user knows why Sheets won't work.
-      // This is often due to API Key restrictions (Referrer).
       const msg = gapiErr?.result?.error?.message || gapiErr?.message || JSON.stringify(gapiErr);
       setError(`Google Sheets API failed to load: ${msg}`);
-      // We do NOT return here, because we still want to try loading the Auth/Identity client
-      // so the user can at least sign in (even if they can't fetch sheets yet).
+      // Continue to try loading auth
     }
 
     // 2. Initialize Identity Services Token Client (The "Auth" Layer)
@@ -87,9 +87,6 @@ export const useGoogleAuth = () => {
         scope: SCOPES,
         callback: async (tokenResponse: any) => {
           if (tokenResponse && tokenResponse.access_token) {
-            // Verify we got the scopes we asked for
-            // Note: google.accounts.oauth2.hasGrantedAllScopes is the standard way, 
-            // but we can also check tokenResponse.scope (space-separated string)
             const hasSheetsScope = window.google.accounts.oauth2.hasGrantedAllScopes(
               tokenResponse,
               'https://www.googleapis.com/auth/spreadsheets'
@@ -113,6 +110,12 @@ export const useGoogleAuth = () => {
 
             // Fetch user profile
             await fetchUserProfile(tokenResponse.access_token);
+
+            // Resolve pending promise if ensureToken was waiting
+            if (pendingTokenResolve.current) {
+              pendingTokenResolve.current(tokenResponse.access_token);
+              pendingTokenResolve.current = null;
+            }
           }
         },
       });
@@ -132,13 +135,13 @@ export const useGoogleAuth = () => {
             await fetchUserProfile(storedToken);
             restored = true;
           } catch (e) {
-            // Token invalid or network error, clear storage
             console.warn("Failed to restore session", e);
             localStorage.removeItem(TOKEN_STORAGE_KEY);
             localStorage.removeItem(EXPIRY_STORAGE_KEY);
           }
         } else {
-          // Expired
+          // If expired on load, we do NOT restore currentUser. 
+          // User sees Login button.
           localStorage.removeItem(TOKEN_STORAGE_KEY);
           localStorage.removeItem(EXPIRY_STORAGE_KEY);
         }
@@ -165,7 +168,6 @@ export const useGoogleAuth = () => {
 
       const userInfo = await userInfoRes.json();
 
-      // Cache email for smart login
       if (userInfo.email) {
         localStorage.setItem(USER_EMAIL_KEY, userInfo.email);
       }
@@ -186,19 +188,45 @@ export const useGoogleAuth = () => {
   const login = useCallback((forceConsent: boolean = false) => {
     if (tokenClientRef.current) {
       const storedEmail = localStorage.getItem(USER_EMAIL_KEY);
-
       const config: any = {
-        prompt: forceConsent ? 'consent' : '', // Empty string = no enforced prompt (standard)
+        prompt: forceConsent ? 'consent' : '',
       };
-
       if (storedEmail && !forceConsent) {
         config.login_hint = storedEmail;
       }
-
       tokenClientRef.current.requestAccessToken(config);
     } else {
       setError('Client not initialized. Please enter API credentials.');
     }
+  }, []);
+
+  // Returns a valid token or prompts for login and returns new token
+  const ensureToken = useCallback(async (): Promise<string | null> => {
+    const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+    const storedExpiry = localStorage.getItem(EXPIRY_STORAGE_KEY);
+
+    if (storedToken && storedExpiry && Date.now() < parseInt(storedExpiry, 10)) {
+      return storedToken;
+    }
+
+    // Token expired or missing. Trigger refresh.
+    if (!tokenClientRef.current) {
+      setError('Auth client not ready.');
+      return null;
+    }
+
+    console.log("Token expired. Refreshing...");
+
+    // Return a promise that resolves when the callback in initTokenClient fires
+    return new Promise<string>((resolve) => {
+      pendingTokenResolve.current = resolve;
+      // Standard login call without forcing consent (unless previously revoked)
+      const storedEmail = localStorage.getItem(USER_EMAIL_KEY);
+      const config: any = { prompt: '' };
+      if (storedEmail) config.login_hint = storedEmail;
+
+      tokenClientRef.current.requestAccessToken(config);
+    });
   }, []);
 
   const logout = useCallback(() => {
@@ -209,7 +237,7 @@ export const useGoogleAuth = () => {
         setCurrentUser(null);
         localStorage.removeItem(TOKEN_STORAGE_KEY);
         localStorage.removeItem(EXPIRY_STORAGE_KEY);
-        localStorage.removeItem(USER_EMAIL_KEY); // Clean up email on explicit logout
+        localStorage.removeItem(USER_EMAIL_KEY);
       });
     } else {
       setCurrentUser(null);
@@ -220,39 +248,23 @@ export const useGoogleAuth = () => {
   }, []);
 
   const checkSession = useCallback(() => {
-    // If not logged in, nothing to check, technically "valid" in that we aren't in an invalid state, but here we want to know if session is active.
-    // However, if we are calling this to "check if logged in", returning false is correct.
     if (!currentUser) return false;
-
     const storedExpiry = localStorage.getItem(EXPIRY_STORAGE_KEY);
     if (!storedExpiry) return false;
 
-    // Check expiry
     if (Date.now() >= parseInt(storedExpiry, 10)) {
-      console.warn("Session expired proactively.");
-
-      // Force logout cleanup but maybe keep email convenience? 
-      // The user requested: "Prompt them to sign in again".
-      // Calling logout() clears everything and currentUser, which triggers App.tsx to show HomeScreen with login prompt.
-
-      // We'll call the internal logout logic but maybe skip the network revoke if token is already dead?
-      // Token expiry is client-side heuristic here. Google might still accept it if clock skew, but let's be safe.
-      // Actually, safely calling logout() is fine.
-      logout();
-      setError("Session expired. Please sign in again.");
+      console.warn("Session expired (soft check).");
       return false;
     }
     return true;
-  }, [currentUser, logout]);
+  }, [currentUser]);
 
   // Proactive Period Check
   useEffect(() => {
     if (!currentUser) return;
-
     const interval = setInterval(() => {
       checkSession();
-    }, 60000); // 1 minute
-
+    }, 60000);
     return () => clearInterval(interval);
   }, [currentUser, checkSession]);
 
@@ -264,6 +276,7 @@ export const useGoogleAuth = () => {
     currentUser,
     error,
     isLoading,
-    checkSession
+    checkSession,
+    ensureToken
   };
 };

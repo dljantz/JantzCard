@@ -136,8 +136,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
     if (!apiKey || !clientId) {
-      alert("Configuration Error: API Key or Client ID missing in environment variables.");
-      return;
+      // If keys are missing, we should show the error in the UI instead of an alert.
+      // We can reuse the Auth Error display logic or add a specific check.
+      if (!apiKey || !clientId) {
+        // We will let the UI render the error below
+        return;
+      }
     }
 
     // Explicit login (silent=false)
@@ -168,7 +172,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   : // Default/Info State (Blue)
                   'bg-blue-900/40 border-blue-700 text-blue-200'
               }`}>
-              <p className="font-semibold">Status Update:</p>
+              <p className="font-semibold">{syncMessage.includes('Success') || syncMessage.includes('reloaded') ? 'Status:' : 'Notice:'}</p>
               <p>{syncMessage}</p>
             </div>
           )}
@@ -246,11 +250,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 {/* Auth Error passed from Parent */}
                 {authError && (
                   <div className="bg-red-900/20 border border-red-800 p-3 rounded text-sm text-red-300 break-words">
-                    <p className="font-bold">System Error:</p>
+                    <p className="font-bold">Login Failed:</p>
                     <p>{authError}</p>
                   </div>
                 )}
               </div>
+
+              {/* Configuration Error Banner */}
+              {(!import.meta.env.VITE_GOOGLE_API_KEY || !import.meta.env.VITE_GOOGLE_CLIENT_ID) && (
+                <div className="bg-yellow-900/30 border border-yellow-700 p-3 rounded text-sm text-yellow-200 mt-2">
+                  <p className="font-bold">App Configuration Missing:</p>
+                  <p>Please set up your API Key and Client ID to continue.</p>
+                </div>
+              )}
 
               <div className="flex flex-col gap-3">
                 <button

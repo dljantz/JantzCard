@@ -41,7 +41,7 @@ const withTimeout = <T>(promise: Promise<T>, ms: number = API_TIMEOUT_MS): Promi
   return Promise.race([
     promise,
     new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error('Request timed out')), ms)
+      setTimeout(() => reject(new Error('Connection timed out. Please check your internet and try again.')), ms)
     )
   ]);
 };
@@ -107,7 +107,7 @@ const getColumnMapping = async (spreadsheetId: string): Promise<ColumnMapping> =
 
   const headers = response.result.values?.[0];
   if (!headers || headers.length === 0) {
-    throw new Error("Sheet is empty or missing headers in Row 1.");
+    throw new Error("We couldn't find any data. Please make sure Row 1 has headers like 'Front' and 'Back'.");
   }
 
   const mapping: any = {};
@@ -120,7 +120,7 @@ const getColumnMapping = async (spreadsheetId: string): Promise<ColumnMapping> =
   // Validate required headers
   const missing = REQUIRED_HEADERS.filter(h => mapping[h] === undefined);
   if (missing.length > 0) {
-    throw new Error(`Missing required columns: ${missing.join(', ')}. Please add them to Row 1.`);
+    throw new Error(`Your sheet is missing these columns: ${missing.join(', ')}. Please add them to Row 1 to continue.`);
   }
 
   return mapping as ColumnMapping;
@@ -132,7 +132,7 @@ const getColumnMapping = async (spreadsheetId: string): Promise<ColumnMapping> =
  */
 export const loadCardsFromSheet = async (spreadsheetId: string): Promise<Card[]> => {
   if (!window.gapi?.client?.sheets) {
-    throw new Error("Google Sheets API not loaded");
+    throw new Error("Google Services inactive. Please refresh the page.");
   }
 
   // 1. Get Column Mapping
@@ -269,7 +269,7 @@ const findRowForCard = async (spreadsheetId: string, card: Card, mapping: Column
  */
 export const updateCardInSheet = async (spreadsheetId: string, card: Card): Promise<void> => {
   if (!window.gapi?.client?.sheets) {
-    throw new Error("Google Sheets API not loaded");
+    throw new Error("Google Services inactive. Please refresh the page.");
   }
 
   const mapping = await getColumnMapping(spreadsheetId);
@@ -278,7 +278,7 @@ export const updateCardInSheet = async (spreadsheetId: string, card: Card): Prom
   if (!rowNumber) {
     console.warn(`RowNotFoundError Debug: ID '${card.id}' not found. Searched using mapping:`, mapping);
     // Optional: could log more details about what WAS found if needed, but that might spam.
-    throw new RowNotFoundError(`Could not find row for card ID: ${card.id}.`);
+    throw new RowNotFoundError(`Sync Error: Card data could not be found in the sheet.`);
   }
 
   // Check for conflict
@@ -347,7 +347,7 @@ export const updateCardInSheet = async (spreadsheetId: string, card: Card): Prom
  */
 export const batchUpdateCards = async (spreadsheetId: string, updates: PendingCardUpdate[]): Promise<void> => {
   if (!window.gapi?.client?.sheets) {
-    throw new Error("Google Sheets API not loaded");
+    throw new Error("Google Services inactive. Please refresh the page.");
   }
 
   const mapping = await getColumnMapping(spreadsheetId);

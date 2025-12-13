@@ -17,6 +17,18 @@ const App: React.FC = () => {
 
   // Custom Hooks
   const {
+    isReady,
+    initializeClient,
+    login,
+    logout,
+    currentUser,
+    error: authError,
+    isLoading: isAuthLoading,
+    checkSession,
+    ensureToken
+  } = useGoogleAuth();
+
+  const {
     queue,
     currentCard,
     isLoading: isDeckLoading,
@@ -30,18 +42,7 @@ const App: React.FC = () => {
     updateCard,
     clearDeck,
     initialQueueLength
-  } = useDeckManager();
-
-  const {
-    isReady,
-    initializeClient,
-    login,
-    logout,
-    currentUser,
-    error: authError,
-    isLoading: isAuthLoading,
-    checkSession
-  } = useGoogleAuth();
+  } = useDeckManager(ensureToken);
 
   // Load History on Login and Return to Home
   useEffect(() => {
@@ -110,7 +111,7 @@ const App: React.FC = () => {
 
   const getSaveStatusMessage = () => {
     if (pendingUpdatesCount > 0 && dataSource === DataSource.Sheet) {
-      return `Cloud Save Failed: ${pendingUpdatesCount} card(s) saved to this device`;
+      return `Offline Mode: ${pendingUpdatesCount} change(s) saved locally. Syncing when online...`;
     }
     return syncMessage;
   };

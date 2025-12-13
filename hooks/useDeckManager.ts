@@ -35,7 +35,7 @@ export interface UseDeckManagerReturn {
     initialQueueLength: number;
 }
 
-export const useDeckManager = (): UseDeckManagerReturn => {
+export const useDeckManager = (ensureToken?: () => Promise<string | null>): UseDeckManagerReturn => {
     const [dataSource, setDataSource] = useState<DataSource>(DataSource.Mock);
     const [cards, setCards] = useState<Card[]>([]);
     const [queue, setQueue] = useState<string[]>([]);
@@ -126,6 +126,10 @@ export const useDeckManager = (): UseDeckManagerReturn => {
         const currentUpdates = pendingUpdatesRef.current;
         if (currentUpdates.length === 0) return;
 
+        if (dataSource === DataSource.Sheet && ensureToken) {
+            await ensureToken();
+        }
+
         console.log(`Attempting to sync ${currentUpdates.length} pending updates...`);
         if (!isProcessingQueueRef.current) setSyncMessage(`Syncing ${currentUpdates.length} offline updates...`);
 
@@ -139,7 +143,7 @@ export const useDeckManager = (): UseDeckManagerReturn => {
             console.error("Backlog sync failed:", err);
             // Keep them in backlog
         }
-    }, [updateBacklog]);
+    }, [updateBacklog, ensureToken, dataSource]);
 
     // Cleanup interval on unmount
     useEffect(() => {
@@ -182,6 +186,11 @@ export const useDeckManager = (): UseDeckManagerReturn => {
             } else {
                 // Sheet Loading
                 if (!url) throw new Error("URL required for Sheet data source");
+
+                if (ensureToken) {
+                    const token = await ensureToken();
+                    if (!token) throw new Error("Authentication required");
+                }
 
                 const spreadsheetId = extractSpreadsheetId(url);
                 if (!spreadsheetId) throw new Error("Invalid Sheet URL");
@@ -231,7 +240,7 @@ export const useDeckManager = (): UseDeckManagerReturn => {
         } finally {
             setIsLoading(false);
         }
-    }, [processBacklog]);
+    }, [processBacklog, ensureToken]);
 
     const reloadDeck = useCallback(async () => {
         if (dataSource !== DataSource.Sheet || !currentSpreadsheetId) return;
@@ -240,6 +249,8 @@ export const useDeckManager = (): UseDeckManagerReturn => {
         setSyncMessage("Reloading deck...");
 
         try {
+            if (ensureToken) await ensureToken();
+
             // Sync existing backlog first
             await processBacklog(currentSpreadsheetId);
 
@@ -267,7 +278,7 @@ export const useDeckManager = (): UseDeckManagerReturn => {
         } finally {
             setIsLoading(false);
         }
-    }, [dataSource, currentSpreadsheetId, processBacklog]);
+    }, [dataSource, currentSpreadsheetId, processBacklog, ensureToken]);
 
     // Unified process for handling the save queue
     const processSaveQueue = useCallback(async () => {
@@ -297,6 +308,18 @@ export const useDeckManager = (): UseDeckManagerReturn => {
                     setCurrentSpreadsheetId(targetSheetId); // Update state for next time
                 }
 
+                // Ensure token before saving each card (or at least check)
+                if (ensureToken) {
+                    try {
+                        await ensureToken();
+                    } catch (e) {
+                        // If auth fails/cancels, we should probably stop the loop and let it retry later?
+                        // Or treat as "Update failed, queueing offline".
+                        console.warn("Auth check failed during save", e);
+                        // Throw to trigger catch block which queues item locally
+                        throw new Error("Authentication failed");
+                    }
+                }
 
                 try {
                     await updateCardInSheet(targetSheetId, nextCard);
@@ -350,7 +373,7 @@ export const useDeckManager = (): UseDeckManagerReturn => {
                 localStorage.removeItem(ACTIVE_QUEUE_STORAGE_KEY);
             }
         }
-    }, [dataSource, currentSpreadsheetId, processBacklog, updateBacklog]);
+    }, [dataSource, currentSpreadsheetId, processBacklog, updateBacklog, ensureToken]);
 
     // Local override to avoid excessive API calls
     const hasUpdatedStreakRef = useRef(false);
