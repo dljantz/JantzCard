@@ -53,8 +53,8 @@ const IntervalButton: React.FC<IntervalButtonProps> = ({
 
   // State-dependent classes for scaling and rings.
   const stateClasses = isSelected
-    ? 'ring-2 ring-white/70 shadow-lg scale-110'
-    : 'hover:scale-105';
+    ? 'ring-4 ring-white/70 shadow-lg brightness-125'
+    : 'hover:brightness-110';
 
   const disabledClasses = disabled ? 'cursor-not-allowed' : '';
 
