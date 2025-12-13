@@ -48,7 +48,7 @@ const Flashcard: React.FC<FlashcardProps> = ({ card, isFlipped }) => {
           style={{ gridArea: 'card' }}
           className={`${faceClasses} [backface-visibility:hidden] [transform:rotateY(180deg)] bg-blue-900/50 border-blue-700`}
         >
-          <div className="w-full h-full flex flex-col items-center justify-center overflow-auto">
+          <div className="w-full flex flex-col items-center justify-center">
             <p className="text-2xl md:text-4xl text-center font-semibold text-teal-300 font-['Merriweather',_serif] whitespace-pre-wrap">{card.back}</p>
           </div>
         </div>

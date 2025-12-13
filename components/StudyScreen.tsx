@@ -261,9 +261,11 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
 
       <ProgressBar current={cardsCompleted} total={initialQueueLength} />
 
-      <main className="flex-grow flex items-center justify-center p-4 overflow-auto">
-        {/* We remove the key prop to allow the same component instance to transition its CSS properties */}
-        <Flashcard card={displayCard} isFlipped={isFlipped} />
+      <main className="flex-grow overflow-auto relative">
+        <div className="min-h-full flex items-center justify-center p-4">
+          {/* We remove the key prop to allow the same component instance to transition its CSS properties */}
+          <Flashcard card={displayCard} isFlipped={isFlipped} />
+        </div>
       </main>
 
       <footer className="sticky bottom-0 left-0 right-0 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700 p-2 md:p-4">
