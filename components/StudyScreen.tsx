@@ -6,7 +6,7 @@ import IntervalSelector from './IntervalSelector';
 import ProgressBar from './ProgressBar';
 import { getProportionalOverdueness } from '../hooks/useStudyQueue';
 import { findClosestInterval } from '../utils/timeUtils';
-import { DEFAULT_CENTER_INTERVAL } from '../constants';
+import { DEFAULT_CENTER_INTERVAL, STUDY_INTERVALS } from '../constants';
 
 interface StudyScreenProps {
   queue: string[];
@@ -39,6 +39,10 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
   // Transition state to hold the previous card's back content during animation
   const [transitionBack, setTransitionBack] = useState<string | null>(null);
 
+  // Delayed flip state
+  const [revealCountdown, setRevealCountdown] = useState<number | null>(null);
+  const revealTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Refs to track state without triggering effect re-runs prematurely
   const previousCardRef = useRef<Card | null>(null);
   const isFlippedRef = useRef(isFlipped);
@@ -64,6 +68,11 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
         setTransitionBack(prevCard.back);
         setIsFlipped(false); // Trigger the flip animation (Back to Front)
         setPreselectedInterval(null);
+        setRevealCountdown(null);
+        if (revealTimerRef.current) {
+          clearInterval(revealTimerRef.current);
+          revealTimerRef.current = null;
+        }
 
         // Clear the override after the CSS transition finishes (700ms matches Flashcard CSS)
         setTimeout(() => {
@@ -78,6 +87,11 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
         setIsFlipped(false);
         setPreselectedInterval(null);
         setTransitionBack(null);
+        setRevealCountdown(null);
+        if (revealTimerRef.current) {
+          clearInterval(revealTimerRef.current);
+          revealTimerRef.current = null;
+        }
       }
 
       previousCardRef.current = currentCard;
@@ -102,28 +116,108 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
     };
     onCardUpdate(updatedCard);
 
+    // Reset reveal state on confirm
+    setRevealCountdown(null);
+    if (revealTimerRef.current) {
+      clearInterval(revealTimerRef.current);
+      revealTimerRef.current = null;
+    }
+
   }, [currentCard, onCardUpdate]); // Removed isSaving dependency since we don't use it here now
 
   const handleIntervalSelect = (interval: string) => {
-    // We no longer block on isSaving, allowing queueing
+    // If clicking the ALREADY selected interval, confirm and advance.
+    // This allows confirming Green intervals without ever flipping (isFlipped=false),
+    // satisfying the requirement to allow fast advancing "without seeing the Back".
+    if (preselectedInterval === interval) {
+      handleConfirmInterval(interval);
+      return;
+    }
 
+    // Otherwise, we are changing the selection (or making the first selection)
+    setPreselectedInterval(interval);
+
+    // Determine if we should flip or show reveal UI
+    // Only applied if we are currently on the Front (!isFlipped).
+    // If already flipped (e.g. selected Red then switched to Green), we stay flipped.
     if (!isFlipped) {
-      setPreselectedInterval(interval);
-      setIsFlipped(true);
-    } else {
-      if (preselectedInterval) {
-        if (interval === preselectedInterval) {
-          handleConfirmInterval(interval);
-        } else {
-          // If clicking a different interval while one is selected,
-          // just switch the selection
-          setPreselectedInterval(interval);
+      // Determine if this is a "Green" interval (greater than center)
+      const intervalLabels = STUDY_INTERVALS.map(i => i.label);
+      const currentIndex = intervalLabels.indexOf(interval);
+      const centerLabelToUse = centerIntervalLabel || DEFAULT_CENTER_INTERVAL;
+      const centerIndex = intervalLabels.indexOf(centerLabelToUse);
+
+      const isGreen = currentIndex > centerIndex;
+
+      if (isGreen) {
+        // DO NOT FLIP.
+        // Reset reveal countdown if they picked a different green button
+        setRevealCountdown(null);
+        if (revealTimerRef.current) {
+          clearInterval(revealTimerRef.current);
+          revealTimerRef.current = null;
         }
       } else {
-        setPreselectedInterval(interval);
+        // Red or Center -> Flip immediately
+        setIsFlipped(true);
+        // Ensure reveal state is clear
+        setRevealCountdown(null);
+        if (revealTimerRef.current) {
+          clearInterval(revealTimerRef.current);
+          revealTimerRef.current = null;
+        }
       }
     }
   };
+
+  const handleRevealClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent background click
+
+    if (!preselectedInterval) return;
+
+    // Calculate delay based on interval increase 
+    // Smallest interval increase (1st green) -> 1s wait
+    // ...
+    // Largest interval increase (5th green) -> 5s wait
+
+    const intervalLabels = STUDY_INTERVALS.map(i => i.label);
+    const currentIndex = intervalLabels.indexOf(preselectedInterval);
+    const centerLabelToUse = centerIntervalLabel || DEFAULT_CENTER_INTERVAL;
+    const centerIndex = intervalLabels.indexOf(centerLabelToUse);
+
+    // Rank 1 to 5
+    let rank = currentIndex - centerIndex;
+    if (rank < 1) rank = 1; // Fallback, though shouldn't happen for green buttons
+    if (rank > 5) rank = 5;
+
+    setRevealCountdown(rank);
+
+    if (revealTimerRef.current) clearInterval(revealTimerRef.current);
+
+    revealTimerRef.current = setInterval(() => {
+      setRevealCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          // Timer finished
+          if (revealTimerRef.current) {
+            clearInterval(revealTimerRef.current);
+            revealTimerRef.current = null;
+          }
+          setIsFlipped(true);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (revealTimerRef.current) {
+        clearInterval(revealTimerRef.current);
+      }
+    };
+  }, []);
 
   const centerIntervalLabel = useMemo(() => {
     if (!currentCard?.lastSeen) {
@@ -137,9 +231,14 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
     // If a selection is active (or card is flipped), 
     // clicking the background should deselect and flip back to front.
     // Note: IntervalButton clicks stop propagation, so they won't trigger this.
-    if (isFlipped) {
+    if (isFlipped || preselectedInterval) {
       setPreselectedInterval(null);
       setIsFlipped(false);
+      setRevealCountdown(null);
+      if (revealTimerRef.current) {
+        clearInterval(revealTimerRef.current);
+        revealTimerRef.current = null;
+      }
     }
   };
 
@@ -265,6 +364,27 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
         <div className="min-h-full flex items-center justify-center p-4">
           {/* We remove the key prop to allow the same component instance to transition its CSS properties */}
           <Flashcard card={displayCard} isFlipped={isFlipped} />
+
+          {/* Delayed Reveal UI */}
+          {!isFlipped && preselectedInterval && (
+            // Render only if it's a "Green" interval logic applies, which implies preselectedInterval > center.
+            // We can re-check or just rely on state. If !isFlipped and preselectedInterval is set, it MUST be green based on handleIntervalSelect logic.
+            <div className="absolute inset-x-0 bottom-[calc(50%-140px)] flex justify-center z-10 pointer-events-none">
+              <button
+                onClick={handleRevealClick}
+                disabled={revealCountdown !== null}
+                className={`
+                  pointer-events-auto
+                  px-8 py-3 rounded-full font-bold text-lg shadow-lg transform transition-all duration-200
+                  ${revealCountdown !== null
+                    ? 'bg-gray-700 text-yellow-400 scale-110 cursor-default'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white hover:scale-105 active:scale-95 cursor-pointer'}
+                `}
+              >
+                {revealCountdown !== null ? `Revealing in ${revealCountdown}...` : 'Reveal Answer'}
+              </button>
+            </div>
+          )}
         </div>
       </main>
 
