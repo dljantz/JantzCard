@@ -19,6 +19,7 @@ interface StudyScreenProps {
   dataSource: DataSource;
   saveError: string | null;
   initialQueueLength: number;
+  deckName?: string | null;
 }
 
 const StudyScreen: React.FC<StudyScreenProps> = ({
@@ -31,7 +32,8 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
   isSaving,
   dataSource,
   saveError,
-  initialQueueLength
+  initialQueueLength,
+  deckName
 }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [preselectedInterval, setPreselectedInterval] = useState<string | null>(null);
@@ -137,28 +139,47 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
     // Otherwise, we are changing the selection (or making the first selection)
     setPreselectedInterval(interval);
 
-    // Determine if we should flip or show reveal UI
-    // Only applied if we are currently on the Front (!isFlipped).
-    // If already flipped (e.g. selected Red then switched to Green), we stay flipped.
-    if (!isFlipped) {
-      // Determine if this is a "Green" interval (greater than center)
-      const intervalLabels = STUDY_INTERVALS.map(i => i.label);
-      const currentIndex = intervalLabels.indexOf(interval);
-      const centerLabelToUse = centerIntervalLabel || DEFAULT_CENTER_INTERVAL;
-      const centerIndex = intervalLabels.indexOf(centerLabelToUse);
+    // Determine if this is a "Reveal Candidate" (Center or Green)
+    // defined as index >= centerIndex.
+    const intervalLabels = STUDY_INTERVALS.map(i => i.label);
+    const currentIndex = intervalLabels.indexOf(interval);
+    const centerLabelToUse = centerIntervalLabel || DEFAULT_CENTER_INTERVAL;
+    const centerIndex = intervalLabels.indexOf(centerLabelToUse);
 
-      const isGreen = currentIndex > centerIndex;
+    const isRevealCandidate = currentIndex >= centerIndex;
 
-      if (isGreen) {
-        // DO NOT FLIP.
-        // Reset reveal countdown if they picked a different green button
+    // Handle "Flip Back" logic if already flipped
+    if (isFlipped) {
+      if (isRevealCandidate) {
+        // User is changing mind to a longer interval while looking at the back.
+        // We should flip back to front and require the Reveal button usage again.
+        setIsFlipped(false);
         setRevealCountdown(null);
         if (revealTimerRef.current) {
           clearInterval(revealTimerRef.current);
           revealTimerRef.current = null;
         }
       } else {
-        // Red or Center -> Flip immediately
+        // Red interval selected while flipped. Just stay flipped (standard Anki behavior).
+        // Ensure reveal is cleared just in case.
+        setRevealCountdown(null);
+        if (revealTimerRef.current) {
+          clearInterval(revealTimerRef.current);
+          revealTimerRef.current = null;
+        }
+      }
+    } else {
+      // Currently on Front (!isFlipped)
+      if (isRevealCandidate) {
+        // DO NOT FLIP. Show Reveal Button.
+        // Reset reveal countdown if they picked a different button
+        setRevealCountdown(null);
+        if (revealTimerRef.current) {
+          clearInterval(revealTimerRef.current);
+          revealTimerRef.current = null;
+        }
+      } else {
+        // Red -> Flip immediately
         setIsFlipped(true);
         // Ensure reveal state is clear
         setRevealCountdown(null);
@@ -176,21 +197,31 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
     if (!preselectedInterval) return;
 
     // Calculate delay based on interval increase 
-    // Smallest interval increase (1st green) -> 1s wait
+    // Center (0) -> 0s wait (Immediate)
+    // 1st Green (1) -> 2s wait
+    // 2nd Green (2) -> 4s wait
     // ...
-    // Largest interval increase (5th green) -> 5s wait
+    // 5th Green (5) -> 10s wait
 
     const intervalLabels = STUDY_INTERVALS.map(i => i.label);
     const currentIndex = intervalLabels.indexOf(preselectedInterval);
     const centerLabelToUse = centerIntervalLabel || DEFAULT_CENTER_INTERVAL;
     const centerIndex = intervalLabels.indexOf(centerLabelToUse);
 
-    // Rank 1 to 5
+    // Rank 0 (Center) to 5 (Max Green)
     let rank = currentIndex - centerIndex;
-    if (rank < 1) rank = 1; // Fallback, though shouldn't happen for green buttons
-    if (rank > 5) rank = 5;
+    if (rank < 0) rank = 0; // Should not happen for reveal buttons (Red flips immediately)
 
-    setRevealCountdown(rank);
+    // Seconds = Rank * 2
+    const seconds = rank * 2;
+
+    if (seconds <= 0) {
+      // Immediate flip for Center button
+      setIsFlipped(true);
+      return;
+    }
+
+    setRevealCountdown(seconds);
 
     if (revealTimerRef.current) clearInterval(revealTimerRef.current);
 
@@ -301,7 +332,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
           )}
         </div>
 
-        <h2 className="text-xl font-bold text-center">JantzCard Study Session</h2>
+        <h2 className="text-xl font-bold text-center">{deckName || "JantzCard Study Session"}</h2>
         <div className="text-center text-sm text-gray-400 mt-1">{`Cards Remaining: ${queue.length}`}</div>
 
         <div className="text-center text-xs text-blue-200/70 mt-2 font-medium tracking-wide">
@@ -360,7 +391,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
 
       <ProgressBar current={cardsCompleted} total={initialQueueLength} />
 
-      <main className="flex-grow overflow-auto relative">
+      <main className="flex-grow overflow-y-auto overflow-x-hidden relative">
         <div className="min-h-full flex items-center justify-center p-4">
           {/* We remove the key prop to allow the same component instance to transition its CSS properties */}
           <Flashcard card={displayCard} isFlipped={isFlipped} />
@@ -381,7 +412,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
                     : 'bg-blue-600 hover:bg-blue-500 text-white hover:scale-105 active:scale-95 cursor-pointer'}
                 `}
               >
-                {revealCountdown !== null ? `Revealing in ${revealCountdown}...` : 'Reveal Answer'}
+                {revealCountdown !== null ? `Revealing in ${revealCountdown}...` : 'Reveal'}
               </button>
             </div>
           )}

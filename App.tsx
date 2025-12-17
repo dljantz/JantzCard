@@ -41,7 +41,8 @@ const App: React.FC = () => {
     reloadDeck,
     updateCard,
     clearDeck,
-    initialQueueLength
+    initialQueueLength,
+    deckName
   } = useDeckManager(ensureToken);
 
   // Load History on Login and Return to Home
@@ -152,6 +153,7 @@ const App: React.FC = () => {
             dataSource={dataSource}
             saveError={getSaveStatusMessage()}
             initialQueueLength={initialQueueLength}
+            deckName={deckName}
           />
         );
       case AppState.Finished:
@@ -188,7 +190,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col font-sans w-full overflow-x-hidden">
       {renderContent()}
     </div>
   );

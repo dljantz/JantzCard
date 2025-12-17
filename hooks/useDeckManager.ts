@@ -33,6 +33,7 @@ export interface UseDeckManagerReturn {
     updateCard: (card: Card) => Promise<void>;
     clearDeck: () => void;
     initialQueueLength: number;
+    deckName: string | null;
 }
 
 export const useDeckManager = (ensureToken?: () => Promise<string | null>): UseDeckManagerReturn => {
@@ -45,6 +46,7 @@ export const useDeckManager = (ensureToken?: () => Promise<string | null>): UseD
     const [syncMessage, setSyncMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pendingUpdates, setPendingUpdates] = useState<PendingCardUpdate[]>([]);
+    const [deckName, setDeckName] = useState<string | null>(null);
 
     // Ref for pending updates to ensure synchronous access in loops
     const pendingUpdatesRef = useRef<PendingCardUpdate[]>([]);
@@ -167,6 +169,7 @@ export const useDeckManager = (ensureToken?: () => Promise<string | null>): UseD
         setInitialQueueLength(0);
         setError(null);
         setSyncMessage(null);
+        setDeckName(null);
     }, []);
 
     const loadDeck = useCallback(async (source: DataSource, url?: string) => {
@@ -183,6 +186,7 @@ export const useDeckManager = (ensureToken?: () => Promise<string | null>): UseD
                 setQueue(newQueue);
                 setInitialQueueLength(newQueue.length);
                 setCurrentSpreadsheetId(null);
+                setDeckName("Demo Deck");
             } else {
                 // Sheet Loading
                 if (!url) throw new Error("URL required for Sheet data source");
@@ -230,8 +234,14 @@ export const useDeckManager = (ensureToken?: () => Promise<string | null>): UseD
 
                 // History Update (Fire and forget)
                 getSpreadsheetTitle(spreadsheetId)
-                    .then(title => addToHistory({ spreadsheetId, name: title, lastVisited: Date.now() }))
-                    .catch(console.warn);
+                    .then(title => {
+                        addToHistory({ spreadsheetId, name: title, lastVisited: Date.now() });
+                        setDeckName(title);
+                    })
+                    .catch(e => {
+                        console.warn(e);
+                        setDeckName("Study Deck");
+                    });
             }
         } catch (err: any) {
             console.error(err);
@@ -253,6 +263,11 @@ export const useDeckManager = (ensureToken?: () => Promise<string | null>): UseD
 
             // Sync existing backlog first
             await processBacklog(currentSpreadsheetId);
+
+
+            // We should also refresh the deck name if possible, or just keep existing?
+            // Let's refetch to be safe/correct
+            getSpreadsheetTitle(currentSpreadsheetId).then(setDeckName).catch(console.warn);
 
             const loadedCards = await loadCardsFromSheet(currentSpreadsheetId);
 
@@ -419,6 +434,7 @@ export const useDeckManager = (ensureToken?: () => Promise<string | null>): UseD
         reloadDeck,
         updateCard,
         clearDeck,
-        initialQueueLength
+        initialQueueLength,
+        deckName
     };
 };
