@@ -207,7 +207,7 @@ export const loadCardsFromSheet = async (spreadsheetId: string): Promise<Card[]>
       lastSeen: getVal(mapping['Last Seen']) || null,
       currentStudyInterval: getVal(mapping.Interval) || null,
       status: status || 'Active',
-      updatedAt: getVal(mapping.Updated),
+
     });
   });
 
@@ -296,8 +296,8 @@ export const updateCardInSheet = async (spreadsheetId: string, card: Card): Prom
       // If remote is newer (greater) than local, or possibly equal depending on strict "wins" logic.
       // User said: "If the card's Last Seen timestamp in the Sheet is more recent than the one that JantzCard is trying to save, abort"
       if (remoteTime > localTime) {
-         console.warn(`Conflict detected for card ${card.id}. Remote Last Seen (${remoteLastSeen}) is newer than local (${card.lastSeen}). Skipping update.`);
-         shouldUpdate = false;
+        console.warn(`Conflict detected for card ${card.id}. Remote Last Seen (${remoteLastSeen}) is newer than local (${card.lastSeen}). Skipping update.`);
+        shouldUpdate = false;
       }
     }
   }
