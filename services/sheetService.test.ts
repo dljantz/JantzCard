@@ -26,16 +26,16 @@ describe('Conflict Resolution', () => {
         vi.clearAllMocks();
     });
 
-    it('should update card if remote timestamp is older', async () => {
+    it('should update card if remote Last Seen is older', async () => {
         // Mock getColumnMapping response (Header row)
         mockGet.mockResolvedValueOnce({
             result: {
-                values: [['Front', 'Back', 'Updated', 'ID']]
+                values: [['Front', 'Back', 'Last Seen', 'ID']]
             }
         });
 
         // Mock current rows response for batchUpdateCards
-        // Row 2: ID="123", Updated="2023-01-01T00:00:00Z"
+        // Row 2: ID="123", Last Seen="2023-01-01T00:00:00Z"
         mockGet.mockResolvedValueOnce({
             result: {
                 values: [
@@ -46,9 +46,9 @@ describe('Conflict Resolution', () => {
 
         const update: PendingCardUpdate = {
             id: '123',
-            lastSeen: null,
+            lastSeen: '2023-01-02T00:00:00Z', // Newer
             currentStudyInterval: null,
-            updatedAt: '2023-01-02T00:00:00Z' // Newer
+            updatedAt: '2023-01-02T00:00:00Z'
         };
 
         await batchUpdateCards('sheet-id', [update]);
@@ -56,24 +56,23 @@ describe('Conflict Resolution', () => {
         expect(mockBatchUpdate).toHaveBeenCalled();
         const callArgs = mockBatchUpdate.mock.calls[0][0];
         const data = callArgs.resource.data;
-        // Expect update to be pushed (Updated column is C/col 2)
-        // Indices: Front=0, Back=1, Updated=2, ID=3
-        // Update should include Updated column at C2
-        const updatedColUpdate = data.find((d: any) => d.range.includes('C2'));
-        expect(updatedColUpdate).toBeDefined();
-        expect(updatedColUpdate.values[0][0]).toBe('2023-01-02T00:00:00Z');
+        // Expect update to be pushed (Last Seen column is C/col 2)
+        // Indices: Front=0, Back=1, Last Seen=2, ID=3
+        const lastSeenColUpdate = data.find((d: any) => d.range.includes('C2'));
+        expect(lastSeenColUpdate).toBeDefined();
+        expect(lastSeenColUpdate.values[0][0]).toBe('2023-01-02T00:00:00Z');
     });
 
-    it('should SKIP update if remote timestamp is newer', async () => {
+    it('should SKIP update if remote Last Seen is newer', async () => {
         // Mock getColumnMapping response
         mockGet.mockResolvedValueOnce({
             result: {
-                values: [['Front', 'Back', 'Updated', 'ID']]
+                values: [['Front', 'Back', 'Last Seen', 'ID']]
             }
         });
 
         // Mock current rows
-        // Row 2: ID="123", Updated="2024-01-01T00:00:00Z" (Newer than local)
+        // Row 2: ID="123", Last Seen="2024-01-01T00:00:00Z" (Newer than local)
         mockGet.mockResolvedValueOnce({
             result: {
                 values: [
@@ -84,9 +83,9 @@ describe('Conflict Resolution', () => {
 
         const update: PendingCardUpdate = {
             id: '123',
-            lastSeen: null,
+            lastSeen: '2023-01-01T00:00:00Z', // Older
             currentStudyInterval: null,
-            updatedAt: '2023-01-01T00:00:00Z' // Older
+            updatedAt: '2023-01-01T00:00:00Z'
         };
 
         await batchUpdateCards('sheet-id', [update]);
@@ -94,16 +93,19 @@ describe('Conflict Resolution', () => {
         expect(mockBatchUpdate).not.toHaveBeenCalled();
     });
 
-    it('should SKIP update if remote timestamp is EQUAL', async () => {
+    it('should PROCEED with update if remote Last Seen is EQUAL (Remote not > Local)', async () => {
+        // User logic: "If the card's Last Seen timestamp in the Sheet is more recent ... abort"
+        // So equal should NOT abort.
+
         // Mock getColumnMapping response
         mockGet.mockResolvedValueOnce({
             result: {
-                values: [['Front', 'Back', 'Updated', 'ID']]
+                values: [['Front', 'Back', 'Last Seen', 'ID']]
             }
         });
 
         // Mock current rows
-        // Row 2: ID="123", Updated="2024-01-01T00:00:00Z" "123"
+        // Row 2: ID="123", Last Seen="2024-01-01T00:00:00Z"
         mockGet.mockResolvedValueOnce({
             result: {
                 values: [
@@ -114,14 +116,20 @@ describe('Conflict Resolution', () => {
 
         const update: PendingCardUpdate = {
             id: '123',
-            lastSeen: null,
+            lastSeen: '2024-01-01T00:00:00Z', // Equal
             currentStudyInterval: null,
-            updatedAt: '2024-01-01T00:00:00Z' // Equal
+            updatedAt: '2024-01-01T00:00:00Z'
         };
 
         await batchUpdateCards('sheet-id', [update]);
 
-        expect(mockBatchUpdate).not.toHaveBeenCalled();
+        expect(mockBatchUpdate).toHaveBeenCalled();
+        const callArgs = mockBatchUpdate.mock.calls[0][0];
+        const data = callArgs.resource.data;
+        const lastSeenColUpdate = data.find((d: any) => d.range.includes('C2'));
+        expect(lastSeenColUpdate).toBeDefined();
+        // It updates with the local value (which is same).
+        expect(lastSeenColUpdate.values[0][0]).toBe('2024-01-01T00:00:00Z');
     });
 
     it('should handle numeric IDs from sheet gracefully in batchUpdateCards', async () => {

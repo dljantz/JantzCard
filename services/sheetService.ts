@@ -27,7 +27,6 @@ interface ColumnMapping {
   Interval?: number;
   Status?: number;
   ID?: number;
-  Updated?: number;
 }
 
 
@@ -281,30 +280,24 @@ export const updateCardInSheet = async (spreadsheetId: string, card: Card): Prom
     throw new RowNotFoundError(`Sync Error: Card data could not be found in the sheet.`);
   }
 
-  // Check for conflict
-  // We need to fetch the CURRENT row to compare timestamps.
-  // Note: findRowForCard already fetches the whole sheet (inefficient but safe for now),
-  // but it returns an index. We might need to refactor or just fetch the specific row again if we had the index.
-  // Since we don't have the row data from findRowForCard, let's just fetch the specific cell for 'Updated' if possible,
-  // or more simply, let's rely on the fact that we need to read before write for conflict resolution.
-
-  // Actually, to be safe and atomic-ish, we should check the timestamp.
-  // We can fetch just the 'Updated' column for that row.
+  // Check for conflict using 'Last Seen'
   let shouldUpdate = true;
-  if (mapping.Updated !== undefined) {
-    const updatedColLetter = getColumnLetter(mapping.Updated);
+  if (mapping['Last Seen'] !== undefined) {
+    const lastSeenColLetter = getColumnLetter(mapping['Last Seen']);
     const timeResponse = await withTimeout<any>(window.gapi.client.sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `Deck!${updatedColLetter}${rowNumber}`
+      range: `Deck!${lastSeenColLetter}${rowNumber}`
     }));
-    const remoteUpdated = timeResponse.result.values?.[0]?.[0];
+    const remoteLastSeen = timeResponse.result.values?.[0]?.[0];
 
-    if (remoteUpdated && card.updatedAt) {
-      const remoteTime = new Date(remoteUpdated).getTime();
-      const localTime = new Date(card.updatedAt).getTime();
-      if (remoteTime >= localTime) {
-        console.warn(`Conflict detected for card ${card.id}. Remote (${remoteUpdated}) is newer or equal to local (${card.updatedAt}). Skipping update.`);
-        shouldUpdate = false;
+    if (remoteLastSeen && card.lastSeen) {
+      const remoteTime = new Date(remoteLastSeen).getTime();
+      const localTime = new Date(card.lastSeen).getTime();
+      // If remote is newer (greater) than local, or possibly equal depending on strict "wins" logic.
+      // User said: "If the card's Last Seen timestamp in the Sheet is more recent than the one that JantzCard is trying to save, abort"
+      if (remoteTime > localTime) {
+         console.warn(`Conflict detected for card ${card.id}. Remote Last Seen (${remoteLastSeen}) is newer than local (${card.lastSeen}). Skipping update.`);
+         shouldUpdate = false;
       }
     }
   }
@@ -329,7 +322,7 @@ export const updateCardInSheet = async (spreadsheetId: string, card: Card): Prom
   addUpdate(mapping.Interval, card.currentStudyInterval);
   addUpdate(mapping.Status, card.status || 'Active');
   addUpdate(mapping.ID, card.id);
-  addUpdate(mapping.Updated, card.updatedAt);
+  // addUpdate(mapping.Updated, card.updatedAt); // Removed as per user request
 
   if (updates.length > 0) {
     await withTimeout(window.gapi.client.sheets.spreadsheets.values.batchUpdate({
@@ -370,15 +363,15 @@ export const batchUpdateCards = async (spreadsheetId: string, updates: PendingCa
     }
 
     if (rowIndex !== -1) {
-      // Conflict Resolution for Batch
+      // Conflict Resolution for Batch using 'Last Seen'
       let shouldUpdate = true;
-      if (mapping.Updated !== undefined && update.updatedAt) {
-        const remoteUpdated = rows[rowIndex][mapping.Updated];
-        if (remoteUpdated) {
-          const remoteTime = new Date(remoteUpdated).getTime();
-          const localTime = new Date(update.updatedAt).getTime();
-          if (remoteTime >= localTime) {
-            console.warn(`Conflict: Remote ${remoteUpdated} >= Local ${update.updatedAt} for card ${update.id}`);
+      if (mapping['Last Seen'] !== undefined && update.lastSeen) {
+        const remoteLastSeen = rows[rowIndex][mapping['Last Seen']];
+        if (remoteLastSeen) {
+          const remoteTime = new Date(remoteLastSeen).getTime();
+          const localTime = new Date(update.lastSeen).getTime();
+          if (remoteTime > localTime) {
+            console.warn(`Conflict: Remote Last Seen ${remoteLastSeen} > Local ${update.lastSeen} for card ${update.id}`);
             shouldUpdate = false;
           }
         }
@@ -400,7 +393,7 @@ export const batchUpdateCards = async (spreadsheetId: string, updates: PendingCa
         addUpdate(mapping['Last Seen'], update.lastSeen);
         addUpdate(mapping.Interval, update.currentStudyInterval);
         addUpdate(mapping.ID, update.id); // Ensure ID is persisted/re-affirmed
-        addUpdate(mapping.Updated, update.updatedAt);
+        // addUpdate(mapping.Updated, update.updatedAt); // Removed at user request
       }
     }
   }
