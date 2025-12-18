@@ -110,6 +110,7 @@ const App: React.FC = () => {
     setAppState(AppState.Home);
   };
 
+
   const getSaveStatusMessage = () => {
     if (pendingUpdatesCount > 0 && dataSource === DataSource.Sheet) {
       return `Offline Mode: ${pendingUpdatesCount} change(s) saved locally. Syncing when online...`;

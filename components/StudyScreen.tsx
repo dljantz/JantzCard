@@ -45,6 +45,11 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
   const [revealCountdown, setRevealCountdown] = useState<number | null>(null);
   const revealTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Post-Error Slowing State
+  const [postErrorCountdown, setPostErrorCountdown] = useState<number | null>(null); // null = inactive, >0 = counting, 0 = done (show Next)
+  const [pendingInterval, setPendingInterval] = useState<string | null>(null);
+  const postErrorTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Refs to track state without triggering effect re-runs prematurely
   const previousCardRef = useRef<Card | null>(null);
   const isFlippedRef = useRef(isFlipped);
@@ -75,6 +80,13 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
           clearInterval(revealTimerRef.current);
           revealTimerRef.current = null;
         }
+        // Reset post-error state
+        setPostErrorCountdown(null);
+        setPendingInterval(null);
+        if (postErrorTimerRef.current) {
+          clearInterval(postErrorTimerRef.current);
+          postErrorTimerRef.current = null;
+        }
 
         // Clear the override after the CSS transition finishes (700ms matches Flashcard CSS)
         setTimeout(() => {
@@ -94,6 +106,13 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
           clearInterval(revealTimerRef.current);
           revealTimerRef.current = null;
         }
+        // Reset post-error state
+        setPostErrorCountdown(null);
+        setPendingInterval(null);
+        if (postErrorTimerRef.current) {
+          clearInterval(postErrorTimerRef.current);
+          postErrorTimerRef.current = null;
+        }
       }
 
       previousCardRef.current = currentCard;
@@ -108,7 +127,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
     }
   }, [queue.length, currentCard, onFinish]);
 
-  const handleConfirmInterval = useCallback((interval: string) => {
+  const performCardUpdate = useCallback((interval: string) => {
     if (!currentCard) return;
 
     const updatedCard: Card = {
@@ -125,7 +144,63 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
       revealTimerRef.current = null;
     }
 
-  }, [currentCard, onCardUpdate]); // Removed isSaving dependency since we don't use it here now
+    // Reset post-error state
+    setPostErrorCountdown(null);
+    setPendingInterval(null);
+    if (postErrorTimerRef.current) {
+      clearInterval(postErrorTimerRef.current);
+      postErrorTimerRef.current = null;
+    }
+  }, [currentCard, onCardUpdate]);
+
+  const handleConfirmInterval = useCallback((interval: string) => {
+    if (!currentCard) return;
+
+    // Post-Error Slowing Logic
+    const lastIntended = currentCard.currentStudyInterval;
+    if (lastIntended) {
+      const allLabels = STUDY_INTERVALS.map(i => i.label);
+      const intendedIndex = allLabels.indexOf(lastIntended);
+      const newIndex = allLabels.indexOf(interval);
+
+      // If user selected a SHORTER interval than intended
+      if (intendedIndex !== -1 && newIndex !== -1 && newIndex < intendedIndex) {
+        const steps = intendedIndex - newIndex;
+        // 2 seconds per step drop
+        const delaySeconds = steps * 2; // e.g., 1 step = 2s
+
+        setPendingInterval(interval);
+        setPostErrorCountdown(delaySeconds);
+
+        if (postErrorTimerRef.current) clearInterval(postErrorTimerRef.current);
+        postErrorTimerRef.current = setInterval(() => {
+          setPostErrorCountdown(prev => {
+            if (prev === null || prev <= 1) {
+              if (postErrorTimerRef.current) {
+                clearInterval(postErrorTimerRef.current);
+                postErrorTimerRef.current = null;
+              }
+              return 0; // 0 indicates timer finished, ready for Next
+            }
+            return prev - 1;
+          });
+        }, 1000);
+
+        return; // HALT here, wait for timer/user
+      }
+    }
+
+    // Otherwise, proceed immediately
+    performCardUpdate(interval);
+
+  }, [currentCard, performCardUpdate]);
+
+  const handlePostErrorNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (pendingInterval) {
+      performCardUpdate(pendingInterval);
+    }
+  };
 
   const handleIntervalSelect = (interval: string) => {
     // If clicking the ALREADY selected interval, confirm and advance.
@@ -247,6 +322,9 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
       if (revealTimerRef.current) {
         clearInterval(revealTimerRef.current);
       }
+      if (postErrorTimerRef.current) {
+        clearInterval(postErrorTimerRef.current);
+      }
     };
   }, []);
 
@@ -262,6 +340,18 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
     // If a selection is active (or card is flipped), 
     // clicking the background should deselect and flip back to front.
     // Note: IntervalButton clicks stop propagation, so they won't trigger this.
+
+    // BUT: If we are in Post-Error Slowing mode (pendingInterval is set),
+    // background click should probably do nothing or just flip?
+    // Requirement: "flip the card back and forth to view both sides just by clicking or tapping it."
+    // So if clicking background accomplishes that, great.
+
+    if (pendingInterval) {
+      // In post-error mode, clicking background toggles flip (matches requirement to flip by clicking)
+      setIsFlipped(!isFlipped);
+      return;
+    }
+
     if (isFlipped || preselectedInterval) {
       setPreselectedInterval(null);
       setIsFlipped(false);
@@ -420,14 +510,39 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
       </main>
 
       <footer className="sticky bottom-0 left-0 right-0 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700 p-2 md:p-4">
-        <IntervalSelector
-          centerIntervalLabel={centerIntervalLabel}
-          lastIntendedInterval={currentCard.currentStudyInterval}
-          onSelect={handleIntervalSelect}
-          preselection={preselectedInterval}
-          isFlipped={isFlipped}
-          isDisabled={false}
-        />
+        {pendingInterval ? (
+          <div className="w-full h-[180px] md:h-auto flex flex-col items-center justify-center space-y-4 py-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            {postErrorCountdown !== null && postErrorCountdown > 0 ? (
+              <div className="text-center">
+                <div className="text-4xl md:text-5xl font-mono text-red-500 font-bold mb-2">
+                  {postErrorCountdown}s
+                </div>
+                <p className="text-gray-300 text-sm md:text-base animate-pulse">
+                  Review this card carefully...
+                </p>
+                <p className="text-gray-500 text-xs mt-1">
+                  (Click anywhere to flip)
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={handlePostErrorNext}
+                className="px-12 py-4 bg-green-600 hover:bg-green-500 text-white text-xl font-bold rounded-full shadow-lg transform transition-all hover:scale-105 active:scale-95"
+              >
+                Next Card
+              </button>
+            )}
+          </div>
+        ) : (
+          <IntervalSelector
+            centerIntervalLabel={centerIntervalLabel}
+            lastIntendedInterval={currentCard.currentStudyInterval}
+            onSelect={handleIntervalSelect}
+            preselection={preselectedInterval}
+            isFlipped={isFlipped}
+            isDisabled={false}
+          />
+        )}
       </footer>
     </div>
   );

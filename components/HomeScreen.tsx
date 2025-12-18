@@ -288,7 +288,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   Sign Out
                 </button>
               </div>
+
             </div>
+
           ) : (
             /* Unauthenticated State */
             <div className="space-y-6">
@@ -336,7 +338,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         <button onClick={onNavigateToAbout} className="hover:text-blue-400 transition-colors">About</button>
         <button onClick={onNavigateToSettings} className="hover:text-blue-400 transition-colors">Settings</button>
       </footer>
-    </main>
+    </main >
   );
 };
 
