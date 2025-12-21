@@ -36,7 +36,7 @@ const Flashcard: React.FC<FlashcardProps> = ({ card, isFlipped }) => {
           className={`${faceClasses} [backface-visibility:hidden] bg-gray-800 border-gray-700`}
         >
           <p className="text-gray-400 text-sm mb-2">Priority: {displayPriority}</p>
-          <p className="text-2xl md:text-4xl text-center text-gray-100 font-['Merriweather',_serif] whitespace-pre-wrap">{card.front}</p>
+          <p className="text-2xl md:text-4xl text-center text-gray-100 font-['Courier_New',_'Courier',_monospace] whitespace-pre-wrap">{card.front}</p>
         </div>
 
         {/* 
@@ -49,7 +49,7 @@ const Flashcard: React.FC<FlashcardProps> = ({ card, isFlipped }) => {
           className={`${faceClasses} [backface-visibility:hidden] [transform:rotateY(180deg)] bg-blue-900/50 border-blue-700`}
         >
           <div className="w-full flex flex-col items-center justify-center">
-            <p className="text-2xl md:text-4xl text-center font-semibold text-teal-300 font-['Merriweather',_serif] whitespace-pre-wrap">{card.back}</p>
+            <p className="text-2xl md:text-4xl text-center font-semibold text-teal-300 font-['Courier_New',_'Courier',_monospace] whitespace-pre-wrap">{card.back}</p>
           </div>
         </div>
       </div>
