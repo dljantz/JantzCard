@@ -34,13 +34,13 @@ const IntervalButton: React.FC<IntervalButtonProps> = ({
 }) => {
 
   const sizeClasses = {
-    default: "h-16 md:h-20 text-2xl",
-    small: "h-12 md:h-16 text-lg"
+    default: "h-8 md:h-10 text-lg",
+    small: "h-6 md:h-8 text-sm"
   };
 
   const placeholderSizeClasses = {
-    default: "h-16 md:h-20",
-    small: "h-12 md:h-16"
+    default: "h-8 md:h-10",
+    small: "h-6 md:h-8"
   }
 
   if (!interval) {
