@@ -329,11 +329,18 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
   }, []);
 
   const centerIntervalLabel = useMemo(() => {
-    if (!currentCard?.lastSeen) {
-      return DEFAULT_CENTER_INTERVAL;
+    // Priority 1: Use the last intended interval if available
+    if (currentCard?.currentStudyInterval) {
+      return currentCard.currentStudyInterval;
     }
-    const elapsedMs = Date.now() - new Date(currentCard.lastSeen).getTime();
-    return findClosestInterval(elapsedMs);
+
+    // Priority 2: Use elapsed time if lastSeen is available (fallback for legacy/imported cards)
+    if (currentCard?.lastSeen) {
+      const elapsedMs = Date.now() - new Date(currentCard.lastSeen).getTime();
+      return findClosestInterval(elapsedMs);
+    }
+
+    return DEFAULT_CENTER_INTERVAL;
   }, [currentCard]);
 
   const handleBackgroundClick = () => {

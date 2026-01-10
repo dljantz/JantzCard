@@ -9,7 +9,7 @@ describe('StudyScreen Interval Selection', () => {
         front: 'Front',
         back: 'Back',
         lastSeen: new Date().toISOString(),
-        currentStudyInterval: '1d',
+        currentStudyInterval: '1s',
         status: 'learning',
         category: 'default',
         priorityLevel: 1
