@@ -1,10 +1,7 @@
-
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import IntervalSelector from './IntervalSelector';
-import { DEFAULT_CENTER_INTERVAL, STUDY_INTERVALS, RED_INTERVAL_COLORS, YELLOW_INTERVAL_COLOR, GREEN_INTERVAL_COLORS } from '../constants';
-
-const intervalLabels = STUDY_INTERVALS.map(i => i.label);
+import { RED_INTERVAL_COLORS, YELLOW_INTERVAL_COLOR, GREEN_INTERVAL_COLORS } from '../constants';
 
 describe('IntervalSelector 3-Button Layout & Cycling', () => {
     const defaultProps = {
