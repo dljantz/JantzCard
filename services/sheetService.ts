@@ -136,7 +136,7 @@ const getColumnMapping = async (spreadsheetId: string): Promise<ColumnMapping> =
   const mapping = createColumnMapping(headers);
 
   // Validate required headers
-  const missing = REQUIRED_HEADERS.filter(h => mapping[h] === undefined);
+  const missing = REQUIRED_HEADERS.filter(h => (mapping as any)[h] === undefined);
   if (missing.length > 0) {
     throw new Error(`Your sheet is missing these columns: ${missing.join(', ')}. Please add them to Row 1 to continue.`);
   }
