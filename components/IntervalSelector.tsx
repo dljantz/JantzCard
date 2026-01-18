@@ -104,7 +104,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
     if (ignoreNextClickRef.current) {
       setTimeout(() => {
         ignoreNextClickRef.current = false;
-      }, 600);
+      }, 10);
     }
   };
 
