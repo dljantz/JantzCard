@@ -16,6 +16,9 @@ const TOKEN_STORAGE_KEY = 'jantzcard_google_token';
 const EXPIRY_STORAGE_KEY = 'jantzcard_token_expiry';
 const USER_EMAIL_KEY = 'jantzcard_user_email';
 
+// 5 Minutes buffer to ensure we refresh tokens BEFORE they expire server-side
+const TOKEN_BUFFER_MS = 300000;
+
 export const useGoogleAuth = () => {
   const [isGapiLoaded, setIsGapiLoaded] = useState(false);
   const [isGisLoaded, setIsGisLoaded] = useState(false);
@@ -128,7 +131,8 @@ export const useGoogleAuth = () => {
       let restored = false;
 
       if (storedToken && storedExpiry) {
-        if (Date.now() < parseInt(storedExpiry, 10)) {
+        // Use Buffer: If expired OR within buffer period, don't restore logic, force re-login later
+        if (Date.now() < parseInt(storedExpiry, 10) - TOKEN_BUFFER_MS) {
           window.gapi.client.setToken({ access_token: storedToken });
           try {
             // Validate token by fetching profile
@@ -140,8 +144,11 @@ export const useGoogleAuth = () => {
             localStorage.removeItem(EXPIRY_STORAGE_KEY);
           }
         } else {
-          // If expired on load, we do NOT restore currentUser. 
+          // If expired on load (or within buffer), we do NOT restore currentUser. 
           // User sees Login button.
+          // Note: We don't necessarily clear it here, ensureToken can handle the refresh,
+          // but for "Automatic Restore" we want to be strict.
+          console.log("Token expired or within buffer zone on load. Requiring fresh login.");
           localStorage.removeItem(TOKEN_STORAGE_KEY);
           localStorage.removeItem(EXPIRY_STORAGE_KEY);
         }
@@ -205,7 +212,8 @@ export const useGoogleAuth = () => {
     const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
     const storedExpiry = localStorage.getItem(EXPIRY_STORAGE_KEY);
 
-    if (storedToken && storedExpiry && Date.now() < parseInt(storedExpiry, 10)) {
+    // use Buffer: Refresh if we are within 5 mins of expiry
+    if (storedToken && storedExpiry && Date.now() < parseInt(storedExpiry, 10) - TOKEN_BUFFER_MS) {
       return storedToken;
     }
 
@@ -215,7 +223,7 @@ export const useGoogleAuth = () => {
       return null;
     }
 
-    console.log("Token expired. Refreshing...");
+    console.log("Token expired (or within buffer). Refreshing...");
 
     // Return a promise that resolves when the callback in initTokenClient fires
     return new Promise<string>((resolve) => {
@@ -252,8 +260,10 @@ export const useGoogleAuth = () => {
     const storedExpiry = localStorage.getItem(EXPIRY_STORAGE_KEY);
     if (!storedExpiry) return false;
 
-    if (Date.now() >= parseInt(storedExpiry, 10)) {
-      console.warn("Session expired (soft check).");
+    // soft check: warn if within buffer? Or just expire?
+    // User logic: "Force logout/refresh" if effectively expired.
+    if (Date.now() >= parseInt(storedExpiry, 10) - TOKEN_BUFFER_MS) {
+      console.warn("Session expired (soft check with buffer).");
       return false;
     }
     return true;
