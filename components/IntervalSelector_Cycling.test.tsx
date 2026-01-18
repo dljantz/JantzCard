@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, createEvent } from '@testing-library/react';
 import IntervalSelector from './IntervalSelector';
 import { RED_INTERVAL_COLORS, GREEN_INTERVAL_COLORS } from '../constants';
 
@@ -192,5 +192,17 @@ describe('IntervalSelector 3-Button Layout & Cycling', () => {
         render(<IntervalSelector {...defaultProps} />);
         const centerBtn = screen.getByText('1d');
         expect(centerBtn).toHaveAttribute('title', 'Press and hold for 5 seconds');
+    });
+    it('should NOT prevent default on touch release for Center button (allows click propagation)', () => {
+        render(<IntervalSelector {...defaultProps} />);
+        const centerBtn = screen.getByText('1d');
+
+        const touchEvent = createEvent.touchEnd(centerBtn, { cancelable: true });
+        // Spy on the method of the native event instance
+        const preventDefaultSpy = vi.spyOn(touchEvent, 'preventDefault');
+
+        fireEvent(centerBtn, touchEvent);
+
+        expect(preventDefaultSpy).not.toHaveBeenCalled();
     });
 });

@@ -120,7 +120,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
     handlers.onMouseUp = () => stopCycling(position === 'center' ? null : interval);
     handlers.onMouseLeave = () => stopCycling();
     handlers.onTouchEnd = (e: React.TouchEvent) => {
-      if (e.cancelable) e.preventDefault();
+      if (e.cancelable && position !== 'center') e.preventDefault();
       stopCycling(position === 'center' ? null : interval);
     };
 
