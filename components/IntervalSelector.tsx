@@ -10,6 +10,7 @@ interface IntervalSelectorProps {
   preselection: string | null;
   isFlipped: boolean;
   isDisabled?: boolean;
+  isRightDisabled?: boolean;
 }
 
 const intervalLabels = STUDY_INTERVALS.map(i => i.label);
@@ -20,7 +21,8 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   onSelect,
   preselection,
   isFlipped,
-  isDisabled = false
+  isDisabled = false,
+  isRightDisabled = false
 }) => {
   const [leftOverride, setLeftOverride] = useState<string | null>(null);
   const [rightOverride, setRightOverride] = useState<string | null>(null);
@@ -104,7 +106,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
     if (ignoreNextClickRef.current) {
       setTimeout(() => {
         ignoreNextClickRef.current = false;
-      }, 10);
+      }, 200);
     }
   };
 
@@ -194,7 +196,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
         {/* Right Button (Green, Longer) */}
         <IntervalButton
           interval={rightInterval}
-          backgroundColor={GREEN_INTERVAL_COLORS[4]}
+          backgroundColor={(isDisabled || isRightDisabled) ? '#4B5563' : GREEN_INTERVAL_COLORS[4]}
           isSelected={preselection === rightInterval}
           onClick={(e) => {
             e.stopPropagation();
@@ -202,7 +204,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
             if (rightInterval) onSelect(rightInterval);
           }}
           title={getButtonTooltip(rightInterval, 'right')}
-          disabled={isDisabled}
+          disabled={isDisabled || isRightDisabled}
           isBold={rightInterval === lastIntendedInterval}
           {...getButtonHandlers(rightInterval, 'right')}
         />

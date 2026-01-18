@@ -50,6 +50,9 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
   const [pendingInterval, setPendingInterval] = useState<string | null>(null);
   const postErrorTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Track if flip was caused by a short interval selection (loophole prevention)
+  const [flippedViaShort, setFlippedViaShort] = useState(false);
+
   // Refs to track state without triggering effect re-runs prematurely
   const previousCardRef = useRef<Card | null>(null);
   const isFlippedRef = useRef(isFlipped);
@@ -87,6 +90,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
           clearInterval(postErrorTimerRef.current);
           postErrorTimerRef.current = null;
         }
+        setFlippedViaShort(false);
 
         // Clear the override after the CSS transition finishes (700ms matches Flashcard CSS)
         setTimeout(() => {
@@ -113,6 +117,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
           clearInterval(postErrorTimerRef.current);
           postErrorTimerRef.current = null;
         }
+        setFlippedViaShort(false);
       }
 
       previousCardRef.current = currentCard;
@@ -256,6 +261,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
       } else {
         // Red -> Flip immediately
         setIsFlipped(true);
+        setFlippedViaShort(true);
         // Ensure reveal state is clear
         setRevealCountdown(null);
         if (revealTimerRef.current) {
@@ -548,6 +554,7 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
             preselection={preselectedInterval}
             isFlipped={isFlipped}
             isDisabled={false}
+            isRightDisabled={flippedViaShort}
           />
         )}
       </footer>

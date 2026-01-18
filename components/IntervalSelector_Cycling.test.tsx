@@ -236,4 +236,35 @@ describe('IntervalSelector 3-Button Layout & Cycling', () => {
         // Should confirm now (Call 2)
         expect(onSelectMock).toHaveBeenCalledTimes(2);
     });
+    it('should ignore click even if it arrives 50ms later (simulating mobile touch-to-click delay)', () => {
+        const onSelectMock = vi.fn();
+        const { rerender } = render(<IntervalSelector {...defaultProps} onSelect={onSelectMock} />);
+        const centerBtn = screen.getByText('1d');
+
+        // 1. Hold 5s
+        fireEvent.mouseDown(centerBtn);
+        act(() => {
+            vi.advanceTimersByTime(5000);
+        });
+        expect(onSelectMock).toHaveBeenCalledTimes(1);
+
+        // Update prop (simulate parent state change)
+        rerender(<IntervalSelector {...defaultProps} onSelect={onSelectMock} preselection="1d" />);
+
+        // 2. Release (Mouse Up)
+        fireEvent.mouseUp(centerBtn);
+
+        // 3. Simulate Browser Delay: "click" event often fires 10-300ms after mouseUp/touchEnd
+        // If the safety timeout is 10ms, this 50ms delay will cause the flag to reset too early
+        act(() => {
+            vi.advanceTimersByTime(50);
+        });
+
+        // 4. Ghost Click finally arrives
+        fireEvent.click(centerBtn);
+
+        // 5. This should STILL be ignored (Total calls 1).
+        // If test fails (calls=2), it means 10ms was too short.
+        expect(onSelectMock).toHaveBeenCalledTimes(1);
+    });
 });
