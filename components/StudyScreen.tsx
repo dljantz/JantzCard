@@ -166,8 +166,8 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
       // If user selected a SHORTER interval than intended
       if (intendedIndex !== -1 && newIndex !== -1 && newIndex < intendedIndex) {
         const steps = intendedIndex - newIndex;
-        // 2 seconds per step drop
-        const delaySeconds = steps * 2; // e.g., 1 step = 2s
+        // 5 seconds per step drop
+        const delaySeconds = steps * 5; // e.g., 1 step = 5s
 
         setPendingInterval(interval);
         setPostErrorCountdown(delaySeconds);
@@ -287,8 +287,8 @@ const StudyScreen: React.FC<StudyScreenProps> = ({
     let rank = currentIndex - centerIndex;
     if (rank < 0) rank = 0; // Should not happen for reveal buttons (Red flips immediately)
 
-    // Seconds = Rank * 2
-    const seconds = rank * 2;
+    // Seconds = Rank * 5
+    const seconds = rank * 5;
 
     if (seconds <= 0) {
       // Immediate flip for Center button
