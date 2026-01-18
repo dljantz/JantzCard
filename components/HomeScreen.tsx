@@ -63,9 +63,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     });
     setDeckStats(prev => ({ ...prev, ...newStats }));
 
-    // Fetch in parallel
-    await Promise.all(decksToLoad.map(async (deck) => {
+    // Fetch sequentially to avoid rate limiting or connection pool exhaustion
+    for (const deck of decksToLoad) {
       try {
+        // Small delay between requests to be gentle
+        await new Promise(r => setTimeout(r, 100));
         const cards = await loadCardsFromSheet(deck.spreadsheetId);
         const queue = calculateStudyQueue(cards);
 
@@ -84,7 +86,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           }
         }));
       }
-    }));
+    }
 
     setLastUpdated(Date.now());
     setIsRefreshing(false);
