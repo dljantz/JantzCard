@@ -205,4 +205,35 @@ describe('IntervalSelector 3-Button Layout & Cycling', () => {
 
         expect(preventDefaultSpy).not.toHaveBeenCalled();
     });
+    it('should allow subsequent click if previous hold release did NOT generate a click (timeout safety)', () => {
+        const onSelectMock = vi.fn();
+        // preselection must match for the second click to confirm
+        const { rerender } = render(<IntervalSelector {...defaultProps} onSelect={onSelectMock} />);
+        const centerBtn = screen.getByText('1d');
+
+        // 1. Hold 5s
+        fireEvent.mouseDown(centerBtn);
+        act(() => {
+            vi.advanceTimersByTime(5000);
+        });
+        // Selected
+        expect(onSelectMock).toHaveBeenCalledTimes(1);
+
+        // Update prop
+        rerender(<IntervalSelector {...defaultProps} onSelect={onSelectMock} preselection="1d" />);
+
+        // 2. Release (Mouse Up) but NO Click fires (e.g. drag out or mobile quirk)
+        fireEvent.mouseUp(centerBtn);
+
+        // 3. Wait 1s (Simulate user thinking "Why didn't that work?" or just normal delay)
+        act(() => {
+            vi.advanceTimersByTime(1000);
+        });
+
+        // 4. User clicks again (The "First Tap" that was failing)
+        fireEvent.click(centerBtn);
+
+        // Should confirm now (Call 2)
+        expect(onSelectMock).toHaveBeenCalledTimes(2);
+    });
 });

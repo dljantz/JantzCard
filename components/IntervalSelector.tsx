@@ -98,6 +98,14 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
       ignoreNextClickRef.current = true;
       onSelect(intervalToSelect);
     }
+
+    // Safety reset: If for some reason a click doesn't follow quickly (e.g. context menu or mobile quirk),
+    // ensure we don't block the *next* legitimate user interaction.
+    if (ignoreNextClickRef.current) {
+      setTimeout(() => {
+        ignoreNextClickRef.current = false;
+      }, 600);
+    }
   };
 
   const getButtonHandlers = (interval: string | null, position: 'left' | 'center' | 'right') => {
