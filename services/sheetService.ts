@@ -98,6 +98,30 @@ const generateUniqueId = (): string => {
 /**
  * Fetches the header row (Row 1) and maps column names to indices.
  */
+/**
+ * Pure function to map header row to ColumnMapping.
+ * Allows for aliases (e.g., "Learning Order" -> "Priority").
+ */
+export const createColumnMapping = (headers: string[]): ColumnMapping => {
+  const mapping: any = {};
+
+  headers.forEach((header: string, index: number) => {
+    const rawHeader = header.trim();
+    // Normal mapping
+    mapping[rawHeader] = index;
+
+    // Aliases
+    if (rawHeader.toLowerCase() === 'learning order') {
+      mapping['Priority'] = index;
+    }
+  });
+
+  return mapping;
+};
+
+/**
+ * Fetches the header row (Row 1) and maps column names to indices.
+ */
 const getColumnMapping = async (spreadsheetId: string): Promise<ColumnMapping> => {
   const response = await withTimeout<any>(window.gapi.client.sheets.spreadsheets.values.get({
     spreadsheetId,
@@ -109,12 +133,7 @@ const getColumnMapping = async (spreadsheetId: string): Promise<ColumnMapping> =
     throw new Error("We couldn't find any data. Please make sure Row 1 has headers like 'Front' and 'Back'.");
   }
 
-  const mapping: any = {};
-
-  // Create a case-insensitive lookup
-  headers.forEach((header: string, index: number) => {
-    mapping[header.trim()] = index;
-  });
+  const mapping = createColumnMapping(headers);
 
   // Validate required headers
   const missing = REQUIRED_HEADERS.filter(h => mapping[h] === undefined);
