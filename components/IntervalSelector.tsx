@@ -25,6 +25,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   const [leftOverride, setLeftOverride] = useState<string | null>(null);
   const [rightOverride, setRightOverride] = useState<string | null>(null);
   const cycleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const centerHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const ignoreNextClickRef = useRef(false);
 
   // Reset overrides when preselection is cleared
@@ -71,11 +72,28 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
     }, 500);
   };
 
+  const startCenterHold = (interval: string) => {
+    if (centerHoldTimerRef.current) return;
+    centerHoldTimerRef.current = setTimeout(() => {
+      onSelect(interval);
+      ignoreNextClickRef.current = true; // Prevents the subsequent mouse-up click from confirming
+      centerHoldTimerRef.current = null;
+    }, 5000);
+  };
+
+  const stopCenterHold = () => {
+    if (centerHoldTimerRef.current) {
+      clearTimeout(centerHoldTimerRef.current);
+      centerHoldTimerRef.current = null;
+    }
+  };
+
   const stopCycling = (intervalToSelect?: string | null) => {
     if (cycleTimerRef.current) {
       clearInterval(cycleTimerRef.current);
       cycleTimerRef.current = null;
     }
+    stopCenterHold();
     if (intervalToSelect) {
       ignoreNextClickRef.current = true;
       onSelect(intervalToSelect);
@@ -94,13 +112,16 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
     } else if (position === 'right' && interval !== intervalLabels[intervalLabels.length - 1]) {
       handlers.onMouseDown = () => startCycling(interval, 'longer');
       handlers.onTouchStart = () => startCycling(interval, 'longer');
+    } else if (position === 'center' && interval && preselection !== interval) {
+      handlers.onMouseDown = () => startCenterHold(interval);
+      handlers.onTouchStart = () => startCenterHold(interval);
     }
 
-    handlers.onMouseUp = () => stopCycling(interval);
+    handlers.onMouseUp = () => stopCycling(position === 'center' ? null : interval);
     handlers.onMouseLeave = () => stopCycling();
     handlers.onTouchEnd = (e: React.TouchEvent) => {
       if (e.cancelable) e.preventDefault();
-      stopCycling(interval);
+      stopCycling(position === 'center' ? null : interval);
     };
 
     return handlers;
@@ -109,6 +130,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   const getButtonTooltip = (interval: string | null, position: 'left' | 'center' | 'right') => {
     if (!interval) return undefined;
     if (position === 'center') {
+      if (preselection !== interval) return "Press and hold for 5 seconds";
       if (interval === lastIntendedInterval) return "Repeat last intended study interval";
       return "Repeat last actual study interval";
     }
@@ -147,11 +169,12 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
         {/* Center Button (Yellow, Last Intended) */}
         <IntervalButton
           interval={centerInterval}
-          backgroundColor={YELLOW_INTERVAL_COLOR}
+          backgroundColor={preselection === centerInterval ? YELLOW_INTERVAL_COLOR : '#4B5563'}
           isSelected={preselection === centerInterval}
           onClick={(e) => {
             e.stopPropagation();
             if (ignoreNextClickRef.current) { ignoreNextClickRef.current = false; return; }
+            if (preselection !== centerInterval) return; // Must be selected (via hold) first
             if (centerInterval) onSelect(centerInterval);
           }}
           title={getButtonTooltip(centerInterval, 'center')}

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import IntervalSelector from './IntervalSelector';
-import { RED_INTERVAL_COLORS, YELLOW_INTERVAL_COLOR, GREEN_INTERVAL_COLORS } from '../constants';
+import { RED_INTERVAL_COLORS, GREEN_INTERVAL_COLORS } from '../constants';
 
 describe('IntervalSelector 3-Button Layout & Cycling', () => {
     const defaultProps = {
@@ -100,7 +100,7 @@ describe('IntervalSelector 3-Button Layout & Cycling', () => {
         expect(screen.getByText('7d')).toBeInTheDocument();
     });
 
-    it('should render with correct colors (Red, Yellow, Green)', () => {
+    it('should render with correct colors (Red, Gray, Green)', () => {
         render(<IntervalSelector {...defaultProps} />);
 
         const buttons = screen.getAllByRole('button');
@@ -108,19 +108,89 @@ describe('IntervalSelector 3-Button Layout & Cycling', () => {
         const centerBtn = buttons[1];
         const rightBtn = buttons[2];
 
-        // We check styles or classes. 
-        // Implementation uses inline style via prop? No, it uses Tailwind class `bg-[${color}]` which is JIT.
-        // Wait, verify `IntervalButton` implementation:
-        // `const colorClass = \`bg-[${backgroundColor}]\`;`
-        // So the class name will be literally `bg-[#F00000]` etc.
-
         // Red: #F00000
         expect(leftBtn).toHaveClass(`bg-[${RED_INTERVAL_COLORS[0]}]`);
 
-        // Yellow: #787800
-        expect(centerBtn).toHaveClass(`bg-[${YELLOW_INTERVAL_COLOR}]`);
+        // Center: Gray (Default)
+        expect(centerBtn).toHaveClass(`bg-[#4B5563]`);
 
         // Green: #007878 (Green[4])
         expect(rightBtn).toHaveClass(`bg-[${GREEN_INTERVAL_COLORS[4]}]`);
+    });
+
+    it('should activate Center button after 5 second hold', () => {
+        const onSelectMock = vi.fn();
+        render(<IntervalSelector {...defaultProps} onSelect={onSelectMock} />);
+
+        const centerBtn = screen.getByText('1d');
+
+        // Initially Gray
+        expect(centerBtn).toHaveClass(`bg-[#4B5563]`);
+
+        // Mouse Down
+        fireEvent.mouseDown(centerBtn);
+
+        // Advance 4s - Should not trigger yet
+        act(() => {
+            vi.advanceTimersByTime(4000);
+        });
+        expect(onSelectMock).not.toHaveBeenCalled();
+
+        // Advance 1s (Total 5s)
+        act(() => {
+            vi.advanceTimersByTime(1000);
+        });
+        expect(onSelectMock).toHaveBeenCalledWith('1d');
+    });
+
+    it('should NOT select Center button on quick click (loophole fix)', () => {
+        const onSelectMock = vi.fn();
+        render(<IntervalSelector {...defaultProps} onSelect={onSelectMock} />);
+
+        const centerBtn = screen.getByText('1d');
+
+        // Mouse Down
+        fireEvent.mouseDown(centerBtn);
+        // Mouse Up immediately (quick click)
+        fireEvent.mouseUp(centerBtn);
+        // Also fire click as standard interaction
+        fireEvent.click(centerBtn);
+
+        expect(onSelectMock).not.toHaveBeenCalled();
+    });
+
+    it('should select on 5s hold but NOT confirm on release (ignore subsequent click)', () => {
+        const onSelectMock = vi.fn();
+        const { rerender } = render(<IntervalSelector {...defaultProps} onSelect={onSelectMock} />);
+
+        const centerBtn = screen.getByText('1d');
+
+        // 1. Mouse Down
+        fireEvent.mouseDown(centerBtn);
+
+        // 2. Hold for 5s -> Should Select
+        act(() => {
+            vi.advanceTimersByTime(5000);
+        });
+        expect(onSelectMock).toHaveBeenCalledTimes(1);
+        expect(onSelectMock).toHaveBeenCalledWith('1d');
+
+        // Simulate Parent updating the prop
+        rerender(<IntervalSelector {...defaultProps} onSelect={onSelectMock} preselection="1d" />);
+
+        // 3. Mouse Up + Click (Simulating release action)
+        // The user releases the mouse, which triggers mouseUp and then click
+        fireEvent.mouseUp(centerBtn);
+        fireEvent.click(centerBtn);
+
+        // 4. Expect NO new calls (Total calls still 1)
+        // IF BUGGY: This will fail because the click will trigger onSelect again (confirmation)
+        expect(onSelectMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('should have correct tooltip on Center button', () => {
+        render(<IntervalSelector {...defaultProps} />);
+        const centerBtn = screen.getByText('1d');
+        expect(centerBtn).toHaveAttribute('title', 'Press and hold for 5 seconds');
     });
 });
