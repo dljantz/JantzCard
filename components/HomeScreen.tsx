@@ -19,6 +19,7 @@ interface HomeScreenProps {
   onNavigateToAbout: () => void;
   onNavigateToSettings: () => void;
   syncMessage?: string | null;
+  onDisconnectDeck: (deck: DeckHistoryItem) => void;
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -34,10 +35,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   streak,
   onNavigateToAbout,
   onNavigateToSettings,
-  syncMessage
+  syncMessage,
+  onDisconnectDeck
 }) => {
   // Sheet Verification State
   const [sheetUrl, setSheetUrl] = useState('');
+  const [deckToDisconnect, setDeckToDisconnect] = useState<DeckHistoryItem | null>(null);
 
   // Deck Statistics State
   const [deckStats, setDeckStats] = useState<Record<string, { overdue: number | null, loading: boolean, error: boolean }>>({});
@@ -223,6 +226,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         overdueCount={deckStats[deck.spreadsheetId]?.overdue ?? null}
                         loading={deckStats[deck.spreadsheetId]?.loading ?? false}
                         error={deckStats[deck.spreadsheetId]?.error ?? false}
+                        onDisconnect={(deck) => setDeckToDisconnect(deck)}
                       />
                     ))}
                   </div>
@@ -340,6 +344,40 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         <button onClick={onNavigateToAbout} className="hover:text-blue-400 transition-colors">About</button>
         <button onClick={onNavigateToSettings} className="hover:text-blue-400 transition-colors">Settings</button>
       </footer>
+
+      {/* Disconnect Confirmation Modal */}
+      {deckToDisconnect && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-sm w-full border border-gray-700 shadow-xl text-left">
+            <h3 className="text-xl font-bold text-white mb-2">Disconnect Deck?</h3>
+            <p className="text-gray-300 mb-6">
+              Are you sure you want to disconnect <strong>{deckToDisconnect.name || 'Untitled Deck'}</strong>?
+              <br /><br />
+              This will remove it from your list, but the Google Sheet will <strong>not</strong> be deleted from your Drive.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeckToDisconnect(null)}
+                className="px-4 py-2 rounded text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
+                autoFocus
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (deckToDisconnect) {
+                    onDisconnectDeck(deckToDisconnect);
+                    setDeckToDisconnect(null);
+                  }
+                }}
+                className="px-4 py-2 rounded bg-red-600 hover:bg-red-500 text-white font-semibold shadow-lg transition-transform transform hover:scale-105"
+              >
+                Disconnect
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main >
   );
 };

@@ -8,7 +8,7 @@ import StudyScreen from './components/StudyScreen';
 import CompletionScreen from './components/CompletionScreen';
 import AboutScreen from './components/AboutScreen';
 import SettingsScreen from './components/SettingsScreen';
-import { getHistory, DeckHistoryItem, StreakInfo } from './services/driveService';
+import { getHistory, DeckHistoryItem, StreakInfo, removeFromHistory } from './services/driveService';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.Home);
@@ -101,6 +101,20 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDisconnectDeck = async (deck: DeckHistoryItem) => {
+    // Optimistic update
+    const previousDecks = recentDecks;
+    setRecentDecks(prev => prev.filter(d => d.spreadsheetId !== deck.spreadsheetId));
+
+    try {
+      await removeFromHistory(deck.spreadsheetId);
+    } catch (error) {
+      console.error("Failed to disconnect deck", error);
+      // Revert on error
+      setRecentDecks(previousDecks);
+    }
+  };
+
   const handleFinishStudy = () => {
     setAppState(AppState.Finished);
   };
@@ -136,6 +150,7 @@ const App: React.FC = () => {
           onNavigateToAbout={() => setAppState(AppState.About)}
           onNavigateToSettings={() => setAppState(AppState.Settings)}
           syncMessage={syncMessage}
+          onDisconnectDeck={handleDisconnectDeck}
         />
       );
     }
@@ -185,6 +200,7 @@ const App: React.FC = () => {
             onNavigateToAbout={() => setAppState(AppState.About)}
             onNavigateToSettings={() => setAppState(AppState.Settings)}
             syncMessage={syncMessage}
+            onDisconnectDeck={handleDisconnectDeck}
           />
         );
     }

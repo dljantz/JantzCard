@@ -185,6 +185,50 @@ export const addToHistory = async (deck: DeckHistoryItem): Promise<DeckHistoryIt
     return history;
 };
 
+/**
+ * Removes a deck from the history.
+ */
+export const removeFromHistory = async (spreadsheetId: string): Promise<DeckHistoryItem[]> => {
+    // 1. Ensure Drive API is loaded
+    if (!window.gapi?.client || !window.gapi.client.drive) {
+        try {
+            await window.gapi.client.load('drive', 'v3');
+        } catch (e) {
+            console.error("Failed to load Drive API", e);
+            return [];
+        }
+    }
+
+    let fileId = await searchConfigFile();
+    if (!fileId) {
+        return []; // No history file, nothing to remove
+    }
+
+    // Use cached history if available
+    let currentData = cachedHistory;
+    if (!currentData) {
+        currentData = await readConfigFile(fileId);
+    }
+
+    let history = currentData.recentDecks || [];
+    const initialLength = history.length;
+
+    // Filter out the deck
+    history = history.filter(item => item.spreadsheetId !== spreadsheetId);
+
+    if (history.length === initialLength) {
+        return history; // Nothing changed
+    }
+
+    const newData = {
+        ...currentData,
+        recentDecks: history
+    };
+
+    await updateConfigFile(fileId, newData);
+    return history;
+};
+
 export const getHistory = async (): Promise<HistoryFileContent> => {
     if (!window.gapi?.client?.drive) {
         try {

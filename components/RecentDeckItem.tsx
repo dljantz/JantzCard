@@ -8,13 +8,14 @@ interface RecentDeckItemProps {
     overdueCount: number | null;
     loading: boolean;
     error: boolean;
+    onDisconnect: (deck: DeckHistoryItem) => void;
 }
 
-const RecentDeckItem: React.FC<RecentDeckItemProps> = ({ deck, onStart, overdueCount, loading, error }) => {
+const RecentDeckItem: React.FC<RecentDeckItemProps> = ({ deck, onStart, overdueCount, loading, error, onDisconnect }) => {
     return (
-        <button
+        <div
             onClick={() => onStart(`https://docs.google.com/spreadsheets/d/${deck.spreadsheetId}`)}
-            className="w-full text-left p-3 hover:bg-gray-800 rounded border border-gray-700 hover:border-blue-500 transition-all group flex justify-between items-center"
+            className="w-full text-left p-3 hover:bg-gray-800 rounded border border-gray-700 hover:border-blue-500 transition-all group flex justify-between items-center cursor-pointer relative"
         >
             <div>
                 <div className="font-medium text-blue-400 group-hover:text-blue-300 transition-colors">
@@ -25,7 +26,8 @@ const RecentDeckItem: React.FC<RecentDeckItemProps> = ({ deck, onStart, overdueC
                 </div>
             </div>
 
-            <div className="flex items-center text-sm font-semibold">
+            <div className="flex items-center text-sm font-semibold gap-3">
+                {/* Status Indicator */}
                 {loading ? (
                     <svg className="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -42,8 +44,22 @@ const RecentDeckItem: React.FC<RecentDeckItemProps> = ({ deck, onStart, overdueC
                         {overdueCount} due
                     </span>
                 )}
+
+                {/* Disconnect Button (Visible on Hover) */}
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDisconnect(deck);
+                    }}
+                    title="Disconnect this deck"
+                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-900/50 text-gray-500 hover:text-red-400 rounded-full transition-all"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
             </div>
-        </button>
+        </div>
     );
 };
 
